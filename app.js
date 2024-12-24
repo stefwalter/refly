@@ -1,16 +1,16 @@
-
 const viewer = new Cesium.Viewer('cesiumContainer', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
 });
 
-const osmBuildings = await Cesium.createOsmBuildingsAsync();
-viewer.scene.primitives.add(osmBuildings);
+const project = {
+    flights: []
+};
 
-async function loadData(filename) {
+async function loadFlight(filename) {
 
     // TODO: Escape properly
     // TODO: Hnadle errors
-    const response = await fetch("./route/" + filename);
+    const response = await fetch("./flight/" + filename);
     const igcData = await response.json();
 
     let startTime = null;
@@ -57,17 +57,16 @@ async function loadData(filename) {
         updateCamera();
 
         /*
-        const point = viewer.entities.add({
-            description: `Location: (${fix.longitude}, ${fix.latitude}, ${altitude})`,
-            position: position,
-            point: { pixelSize: 10, color: Cesium.Color.RED }
-        });
-        */
+         * Example code for tracing the entire track
+         *
+         * const point = viewer.entities.add({
+         *   description: `Location: (${fix.longitude}, ${fix.latitude}, ${altitude})`,
+         *   position: position,
+         *   point: { pixelSize: 10, color: Cesium.Color.RED }
+         *});
+         */
 
-        if (!startTime) {
-            startTime = time;
-        }
-
+        startTime = startTime || time;
         endTime = time;
     }
 
@@ -107,20 +106,48 @@ async function loadData(filename) {
         }) ]),
         position: cameraPositions,
         point: { pixelSize: 0, color: Cesium.Color.BLUE },
-        // path: new Cesium.PathGraphics( { width: 3 })
+
+        /*
+         * Change pixelSize above to > 0 to visualize camera position
+         * path: new Cesium.PathGraphics( { width: 3 })
+         */
     });
 
-    viewer.clock.startTime = startTime.clone();
-    viewer.clock.stopTime = endTime.clone();
-    viewer.clock.currentTime = startTime.clone();
-    viewer.timeline.zoomTo(startTime, endTime);
-
-    // Fly the camera to this point.
-    await viewer.camera.zoomOut(1000000);
-    viewer.trackedEntity = camera;
-    viewer.clock.multiplier = 50;
-    viewer.clock.shouldAnimate = true;
+    return {
+        camera: camera,
+        start: startTime,
+        stop: endTime,
+    };
 }
 
-await loadData("DHV-XC-2024-10-21-SWA-Billing_-_Bir-1958965.igc");
+async function load() {
+    const response = await fetch("./metadata.json");
+    const metadata = await response.json();
 
+    let start = null;
+    let stop = null;
+
+    for (let i = 0; i < metadata.flights.length; i++) {
+        const flight = await loadFlight(metadata.flights[i]);
+        project.flights.push(flight);
+
+        if (!start || Cesium.JulianDate.lessThan(flight.start, start))
+            start = flight.start;
+        if (!stop || Cesium.JulianDate.greaterThan(flight.stop, stop))
+            stop = flight.stop;
+    }
+
+    /* Set up the timeline and camera */
+    if (start && stop) {
+        viewer.clock.startTime = start.clone();
+        viewer.clock.stopTime = stop.clone();
+        viewer.clock.currentTime = start.clone();
+        viewer.timeline.zoomTo(start, stop);
+        viewer.trackedEntity = project.flights[0].camera;
+        viewer.clock.multiplier = 50;
+        viewer.clock.shouldAnimate = true;
+        viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
+    }
+}
+
+load();
