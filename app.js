@@ -6,6 +6,20 @@ const project = {
     flights: []
 };
 
+/*
+ * All colors available
+ * https://htmlcolorcodes.com/color-chart/
+ */
+const colors = [
+    "#F1C40F", "#E67E22", "#2ecc71", "#27AE60", "#16A085", "#1ABC9C",
+    "#3498DB", "#8E44AD", "#9B59B6", "#E74C3C", "#C0392B", "#F39C12", "#D35400",
+];
+
+/* A mapping of all pilots to their colors */
+const pilots = {
+
+};
+
 async function loadFlight(filename) {
 
     // TODO: Escape properly
@@ -70,6 +84,13 @@ async function loadFlight(filename) {
         endTime = time;
     }
 
+    const pilot = igcData.pilot;
+    const color = pilots[pilot] || new Cesium.Color(0, 0, 0);
+    if (!pilots[pilot]) {
+        Cesium.Color.fromCssColorString(colors.pop(), color);
+        pilots[pilot] = color;
+    }
+
     while (cameraStack.length > 0)
         updateCamera(true);
 
@@ -85,7 +106,11 @@ async function loadFlight(filename) {
         model: { uri: paragliderUri },
         // Automatically compute the orientation from the position.
         orientation: new Cesium.VelocityOrientationProperty(trackerPositions),
-        path: new Cesium.PathGraphics({ width: 1, leadTime: 0 })
+        path: new Cesium.PathGraphics({
+            width: 1,
+            leadTime: 0,
+            material: new Cesium.ColorMaterialProperty(color)
+        })
     });
 /*
     // Create an entity to both visualize the sample series with a line and create a tracker
@@ -114,6 +139,7 @@ async function loadFlight(filename) {
     });
 
     return {
+        pilot: pilot,
         camera: camera,
         start: startTime,
         stop: endTime,
