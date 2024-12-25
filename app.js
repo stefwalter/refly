@@ -2,7 +2,7 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
 });
 
-const project = {
+const state = {
     flights: []
 };
 
@@ -84,6 +84,11 @@ async function loadFlight(filename) {
         endTime = time;
     }
 
+    /* Update the remaining average position of the camera */
+    while (cameraStack.length > 0)
+        updateCamera(true);
+
+    /* Each pilot gets a color, and keep them unique based on pilot string*/
     const pilot = igcData.pilot;
     const color = pilots[pilot] || new Cesium.Color(0, 0, 0);
     if (!pilots[pilot]) {
@@ -91,12 +96,9 @@ async function loadFlight(filename) {
         pilots[pilot] = color;
     }
 
-    while (cameraStack.length > 0)
-        updateCamera(true);
-
     // Load the glTF model from Cesium ion.
     const paragliderUri = await Cesium.IonResource.fromAssetId(2944256);
-    viewer.entities.add({
+    const paraglider = viewer.entities.add({
         availability: new Cesium.TimeIntervalCollection([ new Cesium.TimeInterval({
             start: startTime,
             stop: endTime
@@ -112,6 +114,7 @@ async function loadFlight(filename) {
             material: new Cesium.ColorMaterialProperty(color)
         })
     });
+
 /*
     // Create an entity to both visualize the sample series with a line and create a tracker
     viewer.entities.add({
@@ -131,6 +134,8 @@ async function loadFlight(filename) {
         }) ]),
         position: cameraPositions,
         point: { pixelSize: 0, color: Cesium.Color.BLUE },
+        viewFrom: new Cesium.Cartesian3(50, -500, 1000),
+        parent: paraglider,
 
         /*
          * Change pixelSize above to > 0 to visualize camera position
@@ -138,12 +143,20 @@ async function loadFlight(filename) {
          */
     });
 
-    return {
+    const flight = {
+        name: filename,
         pilot: pilot,
+        paraglider: paraglider,
         camera: camera,
         start: startTime,
         stop: endTime,
     };
+
+    /* Used for finding our flight based on the entity */
+    paraglider.flight = flight;
+    camera.flight = flight;
+
+    return flight;
 }
 
 async function load() {
@@ -155,8 +168,15 @@ async function load() {
 
     for (let i = 0; i < metadata.flights.length; i++) {
         const flight = await loadFlight(metadata.flights[i]);
-        project.flights.push(flight);
 
+        /* Linked list between flights */
+        flight.next = state.flights[0] || flight;
+        flight.prev = flight.next.prev || flight;
+        state.flights.push(flight);
+        flight.prev.next = flight;
+        flight.next.prev = flight;
+
+        /* Expand the timeframe to include this flight */
         if (!start || Cesium.JulianDate.lessThan(flight.start, start))
             start = flight.start;
         if (!stop || Cesium.JulianDate.greaterThan(flight.stop, stop))
@@ -169,11 +189,48 @@ async function load() {
         viewer.clock.stopTime = stop.clone();
         viewer.clock.currentTime = start.clone();
         viewer.timeline.zoomTo(start, stop);
-        viewer.trackedEntity = project.flights[0].camera;
+        viewer.trackedEntity = state.flights[0].camera;
         viewer.clock.multiplier = 50;
         viewer.clock.shouldAnimate = true;
         viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
     }
 }
 
+function findAvailableFlight(start, direction) {
+    let check = start;
+    do {
+        check = check[direction];
+        if (check.camera.isAvailable(viewer.clock.currentTime))
+            break;
+    } while (check != start);
+    return check;
+}
+
+function changeTracking(old, flight) {
+    const position = viewer.camera.position.clone();
+    viewer.trackedEntity = flight.camera;
+    viewer.camera.position = position;
+    flight.camera.viewFrom = position;
+    console.log("Tracking", old.name, "->", flight.name, position);
+}
+
+function initialize()
+{
+    // TODO: Fix Alt-Tab behavior, where we switch cameras when switching windows
+    window.addEventListener("keyup", function(e) {
+        if (e.keyCode == 9) {
+            const old = viewer.trackedEntity.flight;
+            if (old) {
+                const flight = findAvailableFlight(old, e.shiftKey ? "prev" : "next");
+                if (flight) {
+                    changeTracking(old, flight);
+                    e.preventDefault();
+                    return true;
+                }
+            }
+        }
+    }, true);
+}
+
+initialize();
 load();
