@@ -3,7 +3,8 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
 });
 
 const state = {
-    flights: []
+    flights: [],
+    tzOffset: 0,
 };
 
 /*
@@ -19,6 +20,31 @@ const colors = [
 const pilots = {
 
 };
+
+function parseJulianDate(timestamp) {
+    if (!timestamp)
+        return null;
+    if (typeof timestamp == 'number')
+        timestamp = new Date(Math.max(0, timestamp + state.tzOffset));
+    if (typeof timestamp == 'object')
+        return Cesium.JulianDate.fromDate(timestamp);
+    if (typeof timestamp == 'string')
+        return Cesium.JulianDate.fromIso8601(timestamp);
+    return null;
+}
+
+/* Returns the timezone offset in milliseconds */
+function parseTimeZone(timestamp) {
+    if (!timestamp)
+        return null;
+    if (typeof timestamp == 'number')
+        return timestamp; // Javascript date, milliseconds
+    if (typeof timestamp == 'string') {
+        const date = Cesium.JulianDate.fromIso8601("1970-01-01T00:00:00" + timestamp);
+        return -Cesium.JulianDate.toDate(date).valueOf()
+    }
+    return null;
+}
 
 async function loadFlight(filename) {
 
@@ -59,8 +85,7 @@ async function loadFlight(filename) {
         const fix = igcData.fixes[i];
 
         // const altitude = (fix.gpsAltitude + fix.pressureAltitude) / 2;
-        const unix = Math.floor(fix.timestamp / 1000);
-        const time = new Cesium.JulianDate(JULIAN_TO_UNIX + unix / 86400, unix % 86400);
+        const time = parseJulianDate(fix.timestamp);
         const altitude = fix.gpsAltitude - 70;
         const position = Cesium.Cartesian3.fromDegrees(fix.longitude, fix.latitude, altitude);
 
@@ -163,6 +188,9 @@ async function load() {
     const response = await fetch("./metadata.json");
     const metadata = await response.json();
 
+    /* Number of milliseconds to offset the timestamps */
+    state.tzOffset = parseTimeZone(metadata.timezone || 0);
+
     let start = null;
     let stop = null;
 
@@ -230,6 +258,18 @@ function initialize()
             }
         }
     }, true);
+
+    viewer.animation.viewModel.dateFormatter = function(date, viewModel) {
+        return Cesium.JulianDate.toIso8601(date, 0).slice(0, 10);
+    };
+
+    viewer.animation.viewModel.timeFormatter = function(date, viewModel) {
+        return Cesium.JulianDate.toIso8601(date, 0).slice(11, 19);
+    };
+
+    viewer.timeline.makeLabel = function(date) {
+        return Cesium.JulianDate.toIso8601(date, 0).slice(11, 16);
+    };
 }
 
 initialize();
