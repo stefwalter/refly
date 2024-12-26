@@ -259,6 +259,14 @@ function initialize()
         }
     }, true);
 
+    window.addEventListener("keypress", function(e) {
+        if (e.keyCode == 32) {
+            viewer.animation.viewModel.pauseViewModel.command();
+            e.preventDefault();
+            return true;
+        }
+    }, true);
+
     viewer.animation.viewModel.dateFormatter = function(date, viewModel) {
         return Cesium.JulianDate.toIso8601(date, 0).slice(0, 10);
     };
