@@ -244,9 +244,21 @@ function changeTracking(old, flight) {
 
 function initialize()
 {
+    let tabDown = false;
+
+    window.addEventListener("keydown", function(e) {
+        tabDown = true;
+    }, true);
+
+    window.addEventListener("blur", function(e) {
+        if (e.target == window)
+            tabDown = false;
+    }, true);
+
     // TODO: Fix Alt-Tab behavior, where we switch cameras when switching windows
     window.addEventListener("keyup", function(e) {
-        if (e.keyCode == 9) {
+        if (e.keyCode == 9 && tabDown) {
+            tabDown = false;
             const old = viewer.trackedEntity.flight;
             if (old) {
                 const flight = findAvailableFlight(old, e.shiftKey ? "prev" : "next");
