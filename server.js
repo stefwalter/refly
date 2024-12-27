@@ -34,6 +34,7 @@ app.get('/', function(request, response) {
 [
     "style.css",
     "app.js",
+    "igc-parser.js",
     "config.js",
     "index.html"
 ].forEach((filename) => app.get('/' + filename,
@@ -41,25 +42,6 @@ app.get('/', function(request, response) {
         response.sendFile(path.join(__dirname, filename));
     }
 ));
-
-/* The IGC Parser */
-app.get('/flight/:file', function(request, response) {
-    const data = fs.readFileSync(path.join(directory, request.params.file), 'utf8');
-    let result = null;
-
-    try {
-        result = IGCParser.parse(data);
-    } catch(error) {
-        response.status(405);
-        response.set('Content-Type', "text/plain");
-        response.send("Invalid IGC file");
-        console.warn("Failure to parsing IGC", request.params.file, ":", error);
-        return;
-    }
-
-    response.set('Content-Type', "application/json");
-    response.send(JSON.stringify(result));
-});
 
 // listen for requests :)
 const listener = app.listen(process.env.PORT, function() {

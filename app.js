@@ -232,8 +232,18 @@ Flight.load = async function loadFlight(filename) {
 
     // TODO: Escape properly
     // TODO: Hnadle errors
-    const response = await fetch("./flight/" + filename);
-    const igcData = await response.json();
+    const response = await fetch(filename);
+    const data = await response.text();
+
+    let igcData = null;
+
+    try {
+        igcData = IGCParser.parse(data);
+    } catch(error) {
+        warning("Failure to parsing IGC", request.params.file, ":", error);
+        igcData = { fixes: [ ], pilot: "" };
+    }
+
     return new Flight(igcData, filename);
 }
 
