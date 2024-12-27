@@ -147,9 +147,15 @@ class Flight {
             stop: endTime
         });
 
-        // Load the glTF model from Cesium ion.
+        /* Extend flight availability to an hour after landing */
+        const extended = endTime.clone();
+        Cesium.JulianDate.addHours(endTime, 1, extended);
+
         const paraglider = viewer.entities.add({
-            availability: new Cesium.TimeIntervalCollection([ interval ]),
+            availability: new Cesium.TimeIntervalCollection([
+                interval, /* The actual time of the flight, extended avalability below */
+                new Cesium.TimeInterval({ start: endTime, stop: extended })
+            ]),
             position: paragliderPositions,
             point: { pixelSize: 10, color: pilot.color },
             // Automatically compute the orientation from the position.
@@ -262,7 +268,8 @@ class Video {
 
         /* Store the old rate */
         state.rate = viewer.clock.multiplier;
-        viewer.clock.multiplier = this.rate;
+        const direction = state.rate < 0 ? -1 : 1;
+        viewer.clock.multiplier = this.rate * direction;
     }
 
     stop() {
@@ -414,7 +421,7 @@ async function load() {
 
 function initialize() {
 
-    /* We always have a null pilot */
+    /* We initially have a null pilot */
     Pilot.ensure(null);
 
     /* Change the tracked flight */
