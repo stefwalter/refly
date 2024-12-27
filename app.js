@@ -11,6 +11,9 @@ const DEFAULT_VIEW = new Cesium.Cartesian3(50, -500, 1000);
 /* The graphic for the play button */
 const PLAY_BUTTON = 'data:image/svg+xml;utf8,<svg width="32" height="32" version="1.1" viewBox="0 0 2.4 2.4" xml:space="preserve" xmlns="http://www.w3.org/2000/svg"><path d="m1.2 0c-0.66168 0-1.2 0.53832-1.2 1.2s0.53832 1.2 1.2 1.2 1.2-0.53832 1.2-1.2-0.53832-1.2-1.2-1.2z" stroke-width="0" fill="black"/><path d="m1.8225 1.167-0.88-0.6c-0.01228-0.00832-0.02812-0.00924-0.04124-0.00232-0.01308 0.00692-0.02128 0.02052-0.02128 0.03536v1.2c0 0.01484 0.0082 0.02844 0.02132 0.03536 0.00584 0.00312 0.01228 0.00464 0.01868 0.00464 0.00788 0 0.01576-0.00236 0.02252-0.00696l0.88-0.6c0.01092-0.00744 0.01748-0.0198 0.01748-0.03304s-0.00656-0.0256-0.01748-0.03304z" fill="white" stroke-width="0"/></svg>';
 
+/* Image extensions */
+const IMAGE_EXTS = [ '.jpg', '.jpeg', '.png' ];
+
 const viewer = new Cesium.Viewer('cesiumContainer', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
     selectionIndicator: false,
@@ -235,7 +238,10 @@ Flight.load = async function loadFlight(filename) {
 }
 
 class Video {
-    constructor(videoData, isImage) {
+    constructor(videoData) {
+        const lcase = videoData.filename.toLowerCase();
+        const isImage = IMAGE_EXTS.reduce((acc, ext) => acc + lcase.endsWith(ext), 0) > 0;
+
         const element = document.createElement(isImage ? "div" : "video");
         element.setAttribute("class", "content");
         element.style.visibility = "hidden";
@@ -299,6 +305,7 @@ class Video {
         this.synchronizer = null;
         this.rate = videoData.speed || 1.0;
         this.pilots = new Set();
+        this.isImage = isImage;
 
         pilot.add(this);
         assert(this.pilots.has(pilot));
@@ -335,9 +342,9 @@ class Video {
     }
 };
 
-Video.load = function loadVideo(videoData, isImage) {
+Video.load = function loadVideo(videoData) {
     // TODO: Put all the validation here
-    return new Video(videoData, isImage);
+    return new Video(videoData);
 };
 
 class Pilot {
@@ -435,11 +442,7 @@ async function load() {
         await Flight.load(flights[i]);
 
     for (let i = 0; i < metadata.videos.length; i++)
-        await Video.load(metadata.videos[i], false);
-
-    /* Images get added to the videos for the pilot */
-    for (let i = 0; i < metadata.images.length; i++)
-        await Video.load(metadata.images[i], true);
+        await Video.load(metadata.videos[i]);
 
     Pilot.complete();
 
