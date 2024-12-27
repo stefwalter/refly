@@ -501,16 +501,55 @@ function initialize() {
         console.log("Flight", old, "->", flight ? flight.name : null);
     }
 
+    var timeout = null;
+    var visible = true;
+
+    function hideCesium() {
+        if (visible) {
+            document.getElementById("cesiumContainer").style.visibility = "hidden";
+            viewer.cesiumWidget.targetFrameRate = 1;
+        }
+        visible = false;
+
+        if (timeout !== null) {
+            window.clearTimeout(timeout);
+            timeout = null;
+        }
+    }
+
+    function displayCesium() {
+        if (timeout !== null) {
+            window.clearTimeout(timeout);
+            timeout = null;
+        }
+        if (state.video)
+            timeout = window.setTimeout(hideCesium, 1000);
+        if (!visible) {
+            document.getElementById("cesiumContainer").style.visibility = "visible";
+            viewer.cesiumWidget.targetFrameRate = undefined;
+        }
+        visible = true;
+    }
+
     function changeVideo(video) {
         const old = state.video ? state.video.name : null;
         if (state.video)
             state.video.stop();
         state.video = video;
-        if (video)
+        if (video) {
+            hideCesium();
             state.video.start(viewer.clock.currentTime);
+        } else {
+            displayCesium();
+        }
 
         console.log("Video", old, "->", video ? video.name : null);
     }
+
+    window.addEventListener("mousemove", function(e) {
+        displayCesium();
+        viewer.clock.onTick.raiseEvent(viewer.clock);
+    });
 
     let tabDown = false;
 
@@ -527,6 +566,7 @@ function initialize() {
                 JUMP_SECONDS * direction * Math.abs(viewer.clock.multiplier), jump);
             viewer.clock.currentTime = jump;
         }
+        viewer.clock.onTick.raiseEvent(viewer.clock);
     }, true);
 
     window.addEventListener("blur", function(e) {
@@ -540,6 +580,7 @@ function initialize() {
                 Pilot.change(state.pilot.prev);
             else
                 Pilot.change(state.pilot.next);
+            viewer.clock.onTick.raiseEvent(viewer.clock);
             e.preventDefault();
             return true;
         }
@@ -548,6 +589,7 @@ function initialize() {
     window.addEventListener("keypress", function(e) {
         if (e.keyCode == 32) {
             viewer.animation.viewModel.pauseViewModel.command();
+            viewer.clock.onTick.raiseEvent(viewer.clock);
             e.preventDefault();
             return true;
         }

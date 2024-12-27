@@ -5,6 +5,7 @@ body {
   padding: 0px;
   height: 100%;
 }
+
 #cesiumContainer {
   height: 100%;
 }
@@ -33,16 +34,17 @@ div.content img {
 #pilot {
     position: absolute;
     bottom: 23px;
-    z-index: 20;
     height: 20pt;
     right: 8px;
     font-family: sans-serif;
     font-weight: bold;
 }
 
+/* Stuff that displays above videos */
 .cesium-viewer-animationContainer,
 .cesium-viewer-timelineContainer,
-.cesium-viewer-fullscreenContainer
+.cesium-viewer-fullscreenContainer,
+#pilot
 {
     z-index: 20;
 }
