@@ -16,9 +16,8 @@ if (process.argv.length < 3) {
 }
 
 const directory = process.argv[2];
-const metadata = path.join(directory, "metadata.json");
-if (!fs.existsSync(metadata)) {
-    console.error("Invalid or non existent directory with metadata.json:", metadata);
+if (!fs.existsSync(directory)) {
+    console.error("Invalid or non existent directory:", directory);
     process.exit(2);
 }
 

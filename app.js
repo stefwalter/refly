@@ -2,6 +2,9 @@
 /* Default playback rate of flights */
 const DEFAULT_RATE = 50;
 
+/* Default duration of new images */
+const DEFAULT_DURATION = 5;
+
 /* Seconds to jump when seeking */
 const JUMP_SECONDS = 10;
 
@@ -13,6 +16,12 @@ const PLAY_BUTTON = 'data:image/svg+xml;utf8,<svg width="32" height="32" version
 
 /* Image extensions */
 const IMAGE_EXTS = [ '.jpg', '.jpeg', '.png' ];
+
+/* IGC file extensions */
+const IGC_EXTS = [ '.igc' ];
+
+/* Video extensions */
+const VIDEO_EXTS = [ '.mp4', '.mov' ];
 
 const viewer = new Cesium.Viewer('cesiumContainer', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
@@ -82,16 +91,16 @@ function parseTimeZone(timestamp) {
     assert(typeof timestamp == "invalid");
 }
 
-/* Returns the duration in milliseconds */
+/* Returns the duration in seconds */
 function parseDuration(timestamp) {
     if (!timestamp)
         return 0;
     if (typeof timestamp == 'number')
-        return timestamp * 1000; // Numbers are seconds, convert to ms
+        return timestamp; // Numbers are seconds
     assert(typeof timestamp == "string");
     try {
         const date = Cesium.JulianDate.fromIso8601("1970-01-01T" + timestamp + "Z");
-        return Cesium.JulianDate.toDate(date).valueOf();
+        return Cesium.JulianDate.toDate(date).valueOf() / 1000;
     } catch(e) {
         warning("Couldn't parse duration:", timestamp, e);
         return 0;
@@ -115,13 +124,18 @@ function assumeFileType(filename /* ... */) {
 }
 
 class Flight {
-    constructor(igcData, name) {
+    constructor(igcData, filename) {
         this.igcData = igcData;
-        this.name = name;
+        this.name = filename;
 
         this.paraglider = null;
         this.tracker = null;
         this.interval = null;
+    }
+
+    save() {
+        /* The JSON for this is just the filename */
+        return this.name;
     }
 
     async create() {
@@ -249,7 +263,8 @@ class Flight {
         this.tracker = tracker;
         this.interval = interval;
 
-        pilot.add(this);
+        if (!pilot.add(this))
+            throw Error("Cannot add overlapping or duplicate flight: " + this.name);
         assert(this.pilot == pilot);
 
         // TODO: This uses a private API
@@ -317,8 +332,14 @@ class Video {
         this.billboard = null;
     }
 
-    async create() {
-        const videoData = this.videoData;
+    save() {
+        /* The JSON for this is the videoData */
+        return this.videoData;
+    }
+
+    create() {
+        const that = this;
+        const videoData = that.videoData;
         const isImage = !!assumeFileType(videoData.filename, IMAGE_EXTS);
 
         const element = document.createElement(isImage ? "div" : "video");
@@ -333,7 +354,7 @@ class Video {
         /* Special code for the video */
         if (element.pause) {
             element.setAttribute("loop", "false");
-            element.setAttribute("preload", "auto");
+            element.setAttribute("preload", "metadata");
             element.addEventListener("waiting", function(e) {
                 console.log("Video waiting", videoData.filename);
             });
@@ -344,20 +365,38 @@ class Video {
         }
         document.body.appendChild(element);
 
+        const pilot = Pilot.ensure(videoData.pilot);
+
         // TODO: Validate dates
         const start = parseJulianDate(videoData.timestamp);
-        const stop = start.clone();
-        const duration = parseDuration(videoData.duration);
-        Cesium.JulianDate.addSeconds(start, duration / 1000, stop);
 
-        const interval = new Cesium.TimeInterval({
-            start: start,
-            stop: stop
-        });
+        function completeVideo(resolve, reject) {
+            const duration = parseDuration(videoData.duration) || DEFAULT_DURATION;
+            const stop = start.clone();
+            Cesium.JulianDate.addSeconds(start, duration, stop);
 
-        interval.data = this;
+            const interval = new Cesium.TimeInterval({
+                start: start,
+                stop: stop
+            });
 
-        const pilot = Pilot.ensure(videoData.pilot);
+            interval.data = that;
+            that.interval = interval;
+
+            if (!pilot.add(that)) {
+                reject(new Error("Cannot add overlapping or duplicate video: " + this.name));
+                return;
+            }
+            assert(that.pilot == pilot);
+
+            // TODO: This uses a private API
+            assert(!that.range);
+            that.range = viewer.timeline.addHighlightRange(pilot.color.toCssHexString(),
+                3, pilot.index * 2 + 5);
+            that.range.setRange(interval.start, interval.stop);
+
+            viewer.timeline.zoomTo(state.intervals.start, state.intervals.stop);
+        }
 
         /* Find a flight that overlaps this video's start */
         const flight = pilot.flights.findDataForIntervalContainingDate(start);
@@ -365,7 +404,7 @@ class Video {
             const position = flight.paraglider.position.getValue(start);
 
             const datauri = PLAY_BUTTON.replace("black", pilot.color.toCssHexString()).replace('#', '%23');
-            this.billboard = viewer.entities.add({
+            that.billboard = viewer.entities.add({
                 position: position,
                 billboard: {
                     image: datauri,
@@ -374,24 +413,35 @@ class Video {
                 },
             });
 
-            this.billboard.data = this;
+            that.billboard.data = that;
         }
 
-        this.element = element;
-        this.element.data = this;
-        this.interval = interval;
-        this.synchronizer = null;
+        that.element = element;
+        that.element.data = that;
+        that.synchronizer = null;
 
-        pilot.add(this);
-        assert(this.pilot == pilot);
+        return new Promise((resolve, reject) => {
+            if (isImage || videoData.duration) {
+                completeVideo(resolve, reject);
+                return;
+            }
 
-        // TODO: This uses a private API
-        assert(!this.range);
-        this.range = viewer.timeline.addHighlightRange(pilot.color.toCssHexString(),
-            3, pilot.index * 2 + 5);
-        this.range.setRange(interval.start, interval.stop);
-
-        viewer.timeline.zoomTo(state.intervals.start, state.intervals.stop);
+            const timeout = window.setTimeout(function(ev) {
+                element.removeEventListener("loadedmetadata", listener);
+                window.clearTimeout(timeout);
+                reject(new Error("Timeout finding duration of video: " + that.name));
+            }, 10000);
+            const listener = element.addEventListener("loadedmetadata", function(ev) {
+                element.removeEventListener("loadedmetadata", listener);
+                window.clearTimeout(timeout);
+                if (element.duration) {
+                    videoData.duration = element.duration;
+                    completeVideo(resolve, reject);
+                } else {
+                    reject(new Error("Unable to find duration of video: " + that.name));
+                }
+            });
+        });
     }
 
     destroy() {
@@ -454,10 +504,10 @@ class Video {
     }
 };
 
-Video.load = function loadVideo(videoData) {
+Video.load = async function loadVideo(videoData) {
     // TODO: Put all the validation here
     const video = new Video(videoData);
-    video.create();
+    await video.create();
     return video;
 };
 
@@ -494,10 +544,8 @@ class Pilot {
         /* Two interval collections depending on the type */
         const intervals = obj instanceof Flight ? this.flights : this.videos;
         if (intervals.indexOf(obj.interval.start) >= 0 ||
-            intervals.indexOf(obj.interval.stop) >= 0) {
-            warning("ignoring overlapping timespan:", obj.name, this.name);
-            return;
-        }
+            intervals.indexOf(obj.interval.stop) >= 0)
+            return false;
 
         /* Make sure this can be called multiple times */
         intervals.removeInterval(obj.interval);
@@ -507,6 +555,7 @@ class Pilot {
         state.intervals.addInterval(obj.interval);
 
         obj.pilot = this;
+        return true;
     }
 
     remove(obj) {
@@ -574,17 +623,33 @@ async function load() {
     if (name)
         Pilot.change(state.pilots[name]);
 
+    loaded(null);
+}
+
+function loaded(last) {
+    let current = null;
+
+    if (last) {
+        console.log(last);
+        current = last.interval.start;
+    }
+
     /* Set up the timeline */
     if (state.intervals.length) {
         viewer.clock.startTime = state.intervals.start.clone();
         viewer.clock.stopTime = state.intervals.stop.clone();
-        viewer.clock.currentTime = state.intervals.start.clone();
         viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
+        current = state.intervals.start;
     }
 
+    if (current)
+        viewer.clock.currentTime = current.clone();
+
     /* Set up the default camera */
-    viewer.flyTo(viewer.entities);
-    viewer.camera.position = DEFAULT_VIEW;
+    if (viewer.entities.length) {
+        viewer.flyTo(viewer.entities);
+        viewer.camera.position = DEFAULT_VIEW;
+    }
 }
 
 function initialize() {
@@ -791,6 +856,71 @@ function initialize() {
             changeFlight(flight);
         if (video != currentVideo)
             changeVideo(video);
+    });
+
+    function highlightEvent(ev) {
+        const over = (ev.type == "dragover" || ev.type == "dragenter");
+        document.body.classList.toggle("highlight", over);
+        ev.preventDefault();
+        ev.stopPropagation();
+        return true;
+    }
+
+    window.addEventListener("dragover", highlightEvent);
+    window.addEventListener("dragenter", highlightEvent);
+    window.addEventListener("dragleave", highlightEvent);
+    window.addEventListener("drop", function(ev) {
+        if (ev.dataTransfer && ev.dataTransfer.files) {
+            const files = ev.dataTransfer.files;
+            for (let i = 0; i < files.length; i++) {
+                const exts = assumeFileType(files[i].name, IMAGE_EXTS, IGC_EXTS, VIDEO_EXTS);
+                let promise = null;
+                if (exts == IGC_EXTS) {
+                    promise = Flight.load(files[i].name);
+                } else if (exts) {
+                    promise = Video.load({
+                        filename: files[i].name,
+                        pilot: state.pilot.name,
+                        timestamp: Cesium.JulianDate.toIso8601(viewer.clock.currentTime, 0)
+                    });
+                } else {
+                    warning ("Couldn't load unsupported file:", files[i].name);
+                }
+
+                if (promise) {
+                    promise.then(function(obj) {
+                        loaded(obj);
+                    }).catch(function(ex) {
+                        failure("Couldn't load file", files[i].name, ex)
+                    });
+                }
+            }
+        }
+        return highlightEvent(ev);
+    });
+
+    /* Override the Ctrl-C to provide metadata.json */
+    document.addEventListener('copy', function(ev) {
+        ev.preventDefault();
+
+        const data = {
+            flights: [],
+            videos: [],
+        };
+
+        Object.values(state.pilots).forEach(function(pilot) {
+            for(let i = 0; i < pilot.flights.length; i++) {
+                const item = pilot.flights.get(i).data.save();
+                data.flights.push(item);
+            }
+            for(let i = 0; i < pilot.videos.length; i++) {
+                const item = pilot.videos.get(i).data.save();
+                data.videos.push(item);
+            }
+        });
+
+        const json = JSON.stringify(data, null, 4);
+        ev.clipboardData.setData('text/plain', json);
     });
 }
 

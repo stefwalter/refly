@@ -10,6 +10,10 @@ body {
   height: 100%;
 }
 
+body.highlight {
+    opacity: 50%
+}
+
 video.content,
 picture.content,
 div.content {
