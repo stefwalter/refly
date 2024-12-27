@@ -485,7 +485,18 @@ function initialize() {
     let tabDown = false;
 
     window.addEventListener("keydown", function(e) {
-        tabDown = true;
+        /* The tab key */
+        if (e.keyCode == 9) {
+            tabDown = true;
+
+        /* Left or Right arrow keys */
+        } else if (e.keyCode == 37 || e.keyCode == 39) {
+            const direction = e.keyCode == 37 ? -1 : 1;
+            const jump = new Cesium.JulianDate(0, 0, Cesium.TimeStandard.UTC);
+            Cesium.JulianDate.addSeconds(viewer.clock.currentTime,
+                JUMP_SECONDS * direction * Math.abs(viewer.clock.multiplier), jump);
+            viewer.clock.currentTime = jump;
+        }
     }, true);
 
     window.addEventListener("blur", function(e) {
