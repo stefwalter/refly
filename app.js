@@ -1,6 +1,15 @@
+
 /* Default playback rate of flights */
 const DEFAULT_RATE = 50;
+
+/* Seconds to jump when seeking */
+const JUMP_SECONDS = 10;
+
+/* Default camera offset to track from */
 const DEFAULT_VIEW = new Cesium.Cartesian3(50, -500, 1000);
+
+/* The graphic for the play button */
+const PLAY_BUTTON = 'data:image/svg+xml;utf8,<svg width="32" height="32" version="1.1" viewBox="0 0 2.4 2.4" xml:space="preserve" xmlns="http://www.w3.org/2000/svg"><path d="m1.2 0c-0.66168 0-1.2 0.53832-1.2 1.2s0.53832 1.2 1.2 1.2 1.2-0.53832 1.2-1.2-0.53832-1.2-1.2-1.2z" stroke-width="0" fill="black"/><path d="m1.8225 1.167-0.88-0.6c-0.01228-0.00832-0.02812-0.00924-0.04124-0.00232-0.01308 0.00692-0.02128 0.02052-0.02128 0.03536v1.2c0 0.01484 0.0082 0.02844 0.02132 0.03536 0.00584 0.00312 0.01228 0.00464 0.01868 0.00464 0.00788 0 0.01576-0.00236 0.02252-0.00696l0.88-0.6c0.01092-0.00744 0.01748-0.0198 0.01748-0.03304s-0.00656-0.0256-0.01748-0.03304z" fill="white" stroke-width="0"/></svg>';
 
 const viewer = new Cesium.Viewer('cesiumContainer', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
@@ -249,13 +258,34 @@ class Video {
 
         interval.data = this;
 
+        const pilot = Pilot.ensure(videoData.pilot);
+
+        /* Find a flight that overlaps this video's start */
+        const flight = pilot.flights.findDataForIntervalContainingDate(start);
+        if (flight) {
+            const position = flight.paraglider.position.getValue(start);
+
+            const datauri = PLAY_BUTTON.replace("black", pilot.color.toCssHexString()).replace('#', '%23');
+            this.billboard = viewer.entities.add({
+                position: position,
+                billboard: {
+                    image: datauri,
+                    width: 32,
+                    height: 32
+                },
+            });
+
+            this.billboard.data = this;
+        }
+
         this.name = videoData.filename;
         this.element = element;
         this.element.data = this;
         this.interval = interval;
         this.synchronizer = null;
         this.rate = videoData.speed || 1.0;
-        Pilot.ensure(videoData.pilot).add(this);
+
+        pilot.add(this);
     }
 
     start() {
@@ -378,7 +408,6 @@ async function load() {
     for (let i = 0; i < flights.length; i++)
         await Flight.load(flights[i]);
 
-    // TODO: Video positions
     for (let i = 0; i < metadata.videos.length; i++)
         await Video.load(metadata.videos[i]);
 
@@ -395,7 +424,6 @@ async function load() {
         }
 
         for (let i = 0; i < pilot.videos.length; i++) {
-            // TODO: Video positions
             const video = pilot.videos.get(i).data;
             intervals.addInterval(video.interval);
 
