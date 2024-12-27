@@ -29,8 +29,6 @@ const state = {
 
     /* Currently being displayed */
     pilot: null,
-    flight: null,
-    video: null,
     rate: DEFAULT_RATE,
 };
 
@@ -491,6 +489,8 @@ async function load() {
 }
 
 function initialize() {
+    let currentFlight = null;
+    let currentVideo = null;
 
     /* We initially have a null pilot */
     Pilot.ensure(null);
@@ -500,8 +500,8 @@ function initialize() {
         const position = viewer.camera.position.clone();
         viewer.trackedEntity = flight ? flight.tracker : null;
 
-        const old = state.flight ? state.flight.name : null;
-        state.flight = flight;
+        const old = currentFlight ? currentFlight.name : null;
+        currentFlight = flight;
 
         /* Note that we keep the pilot, even when setting null flight */
         if (flight) {
@@ -535,7 +535,7 @@ function initialize() {
             window.clearTimeout(timeout);
             timeout = null;
         }
-        if (state.video)
+        if (currentVideo)
             timeout = window.setTimeout(hideCesium, 1000);
         if (!visible) {
             document.getElementById("cesiumContainer").style.visibility = "visible";
@@ -545,13 +545,13 @@ function initialize() {
     }
 
     function changeVideo(video) {
-        const old = state.video ? state.video.name : null;
-        if (state.video)
-            state.video.stop();
-        state.video = video;
+        const old = currentVideo ? currentVideo.name : null;
+        if (currentVideo)
+            currentVideo.stop();
+        currentVideo = video;
         if (video) {
             hideCesium();
-            state.video.start(viewer.clock.currentTime);
+            currentVideo.start(viewer.clock.currentTime);
         } else {
             displayCesium();
         }
@@ -674,9 +674,9 @@ function initialize() {
         const vint = pilot.videos.findIntervalContainingDate(clock.currentTime);
         const video = vint ? vint.data : null;
 
-        if (flight != state.flight)
+        if (flight != currentFlight)
             changeFlight(flight);
-        if (video != state.video)
+        if (video != currentVideo)
             changeVideo(video);
     });
 }
