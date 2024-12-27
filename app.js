@@ -25,10 +25,15 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
 
 const state = {
     pilots: { },
+
+    /* The entire set of intervals for the timeline */
+    intervals: new Cesium.TimeIntervalCollection(),
+
     tzOffset: 0,
 
     /* Currently being displayed */
     pilot: null,
+    any: null,
     rate: DEFAULT_RATE,
 };
 
@@ -93,10 +98,38 @@ function parseDuration(timestamp) {
     }
 }
 
+/*
+ * Match the file name to various extension lists
+ * provided as option alguments and return the
+ * extension list that matches.
+ */
+function assumeFileType(filename /* ... */) {
+    assert(typeof filename == "string");
+    const lcase = filename.toLowerCase();
+    for (let i = 1; i < arguments.length; i++) {
+        assert(arguments[i].reduce);
+        if (arguments[i].reduce((acc, ext) => acc + lcase.endsWith(ext), 0) > 0)
+            return arguments[i];
+    }
+    return null;
+}
+
 class Flight {
     constructor(igcData, name) {
+        this.igcData = igcData;
+        this.name = name;
+
+        this.paraglider = null;
+        this.tracker = null;
+        this.interval = null;
+    }
+
+    async create() {
+        const igcData = this.igcData;
         let startTime = null;
         let endTime = null;
+
+        const pilot = Pilot.ensure(igcData.pilot);
 
         // The SampledPositionedProperty stores the position/timestamp for each sample along the series.
         const paragliderPositions = new Cesium.SampledPositionProperty();
@@ -153,9 +186,6 @@ class Flight {
         /* Update the remaining average position of the tracker */
         while (trackerStack.length > 0)
             updateTracker(true);
-
-        /* Each pilot gets a color, and keep them unique based on pilot string*/
-        const pilot = Pilot.ensure(igcData.pilot);
 
         const interval = new Cesium.TimeInterval({
             start: startTime,
@@ -215,14 +245,44 @@ class Flight {
         paraglider.data = this;
         tracker.data = this;
 
-        this.name = name;
         this.paraglider = paraglider;
         this.tracker = tracker;
         this.interval = interval;
-        this.pilots = new Set();
 
         pilot.add(this);
-        assert(this.pilots.has(pilot));
+        assert(this.pilot == pilot);
+
+        // TODO: This uses a private API
+        assert(!this.range);
+        this.range = viewer.timeline.addHighlightRange(pilot.color.toCssHexString(),
+            3, pilot.index * 2);
+        this.range.setRange(interval.start, interval.stop);
+
+        viewer.timeline.zoomTo(state.intervals.start, state.intervals.stop);
+    }
+
+    destroy() {
+        // TODO: This uses private API
+        assert(this.range);
+        this.range.setRange(null, null);
+        this.range = null;
+        viewer.timeline.resize();
+
+        viewer.entities.remove(this.paraglider);
+        this.paraglider.data = null;
+        this.paraglider = null;
+
+        viewer.entities.remove(this.tracker);
+        this.tracker.data = null;
+        this.tracker = null;
+
+        this.pilot.remove(this);
+        assert(this.pilot == null);
+
+        this.interval.data = null;
+        this.interval = null;
+
+        viewer.timeline.zoomTo(state.intervals.start, state.intervals.stop);
     }
 };
 
@@ -238,17 +298,28 @@ Flight.load = async function loadFlight(filename) {
     try {
         igcData = IGCParser.parse(data);
     } catch(error) {
-        warning("Failure to parsing IGC", request.params.file, ":", error);
+        warning("Failure to parsing IGC", filename, ":", error);
         igcData = { fixes: [ ], pilot: "" };
     }
 
-    return new Flight(igcData, filename);
+    var flight = new Flight(igcData, filename);
+    await flight.create();
+    return flight;
 }
 
 class Video {
     constructor(videoData) {
-        const lcase = videoData.filename.toLowerCase();
-        const isImage = IMAGE_EXTS.reduce((acc, ext) => acc + lcase.endsWith(ext), 0) > 0;
+        this.name = this.filename = videoData.filename;
+        this.videoData = videoData;
+        this.rate = 1;
+        this.synchronizer = null;
+        this.element = null;
+        this.billboard = null;
+    }
+
+    async create() {
+        const videoData = this.videoData;
+        const isImage = !!assumeFileType(videoData.filename, IMAGE_EXTS);
 
         const element = document.createElement(isImage ? "div" : "video");
         element.setAttribute("class", "content");
@@ -306,17 +377,50 @@ class Video {
             this.billboard.data = this;
         }
 
-        this.name = videoData.filename;
         this.element = element;
         this.element.data = this;
         this.interval = interval;
         this.synchronizer = null;
-        this.rate = videoData.speed || 1.0;
-        this.pilots = new Set();
-        this.isImage = isImage;
 
         pilot.add(this);
-        assert(this.pilots.has(pilot));
+        assert(this.pilot == pilot);
+
+        // TODO: This uses a private API
+        assert(!this.range);
+        this.range = viewer.timeline.addHighlightRange(pilot.color.toCssHexString(),
+            3, pilot.index * 2 + 5);
+        this.range.setRange(interval.start, interval.stop);
+
+        viewer.timeline.zoomTo(state.intervals.start, state.intervals.stop);
+    }
+
+    destroy() {
+        this.stop();
+        assert(!this.synchronizer);
+
+        assert(this.element);
+        document.body.removeChild(this.element);
+        this.element.data = null;
+
+        if (this.billboard) {
+            viewer.entities.remove(this.billboard);
+            this.billboard.data = null;
+            this.billboard = null;
+        }
+
+        // TODO: This uses private API
+        assert(this.range);
+        this.range.setRange(null, null);
+        this.range = null;
+        viewer.timeline.resize();
+
+        this.pilot.remove(this);
+        assert(this.pilot == null);
+
+        this.interval.data = null;
+        this.interval = null;
+
+        viewer.timeline.zoomTo(state.intervals.start, state.intervals.stop);
     }
 
     start() {
@@ -352,11 +456,15 @@ class Video {
 
 Video.load = function loadVideo(videoData) {
     // TODO: Put all the validation here
-    return new Video(videoData);
+    const video = new Video(videoData);
+    video.create();
+    return video;
 };
 
 class Pilot {
     constructor(name) {
+        assert(typeof name == "string");
+
         this.name = name;
         this.index = Object.keys(state.pilots).length;
         this.flights = new Cesium.TimeIntervalCollection();
@@ -365,6 +473,17 @@ class Pilot {
         /* Each pilot gets a color, and keep them unique based on pilot string*/
         this.color = new Cesium.Color(0, 0, 0);
         Cesium.Color.fromCssColorString(colors.pop(), this.color);
+
+        assert(!state.pilots[this.name]);
+
+        let first = Object.values(state.pilots).at(0);
+        state.pilots[this.name] = this;
+
+        /* A linked list between all pilots */
+        first = this.next = first || this;
+        this.prev = this.next.prev || this;
+        this.prev.next = this;
+        this.next.prev = this;
     }
 
     add(obj) {
@@ -380,51 +499,39 @@ class Pilot {
             return;
         }
 
+        /* Make sure this can be called multiple times */
+        intervals.removeInterval(obj.interval);
         intervals.addInterval(obj.interval);
 
-        /* An object can have multiple pilots */
-        assert(obj.pilots);
-        assert(!obj.pilots.has(this));
-        obj.pilots.add(this);
+        /* This governs the whole timeline */
+        state.intervals.addInterval(obj.interval);
+
+        obj.pilot = this;
+    }
+
+    remove(obj) {
+        assert(obj);
+        assert(obj instanceof Flight || obj instanceof Video);
+        assert(obj.interval.data == obj);
+
+        /* Two interval collections depending on the type */
+        const intervals = obj instanceof Flight ? this.flights : this.videos;
+        intervals.removeInterval(obj.interval);
+
+        obj.pilot = null;
     }
 };
 
 Pilot.ensure = function ensurePilot(name) {
-    const key = name || "";
-    const pilot = state.pilots[key] || new Pilot(key);
-    return state.pilots[key] = pilot;
+    assert(typeof name == "string");
+
+    const pilot = state.pilots[name] || new Pilot(name);
+    assert(state.pilots[name]);
+
+    return pilot;
 };
 
-Pilot.complete = function completePilots() {
-
-    /* The null pilot stuff gets added to all pilots */
-    const npilot = state.pilots[""] || new Pilot("");
-    delete state.pilots[""];
-
-    let first = null;
-
-    Object.values(state.pilots).forEach(function(pilot) {
-        for (let i = 0; i < npilot.flights.length; i++) {
-            const interval = npilot.flights.get(i);
-            pilot.add(interval.data);
-        }
-        for (let i = 0; i < npilot.videos.length; i++) {
-            const interval = npilot.videos.get(i);
-            pilot.add(interval.data);
-        }
-
-        /* A linked list between all pilots */
-        first = pilot.next = first || pilot;
-        pilot.prev = pilot.next.prev || pilot;
-        pilot.prev.next = pilot;
-        pilot.next.prev = pilot;
-    });
-
-    Pilot.change(first);
-}
-
 Pilot.change = function changePilot(pilot) {
-    assert(pilot);
     // Assume that the onTick will change
     state.pilot = pilot;
     const element = document.getElementById("pilot")
@@ -434,52 +541,44 @@ Pilot.change = function changePilot(pilot) {
 }
 
 async function load() {
-    const response = await fetch("./metadata.json");
-    // TODO: Validate contents
-    const metadata = await response.json();
+    let metadata = { };
+
+    try {
+        const response = await fetch("metadata.json");
+        if (response.ok) {
+            metadata = await response.json();
+        } else {
+            if (response.status == 404)
+                warning("no metadata.json, starting blank");
+            else
+                warning("couldn't load metadata.json", response.status, response.statusText);
+        }
+    } catch (ex) {
+        warning("couldn't load metadata.json", ex);
+    }
 
     /* Number of milliseconds to offset the timestamps */
     state.tzOffset = parseTimeZone(metadata.timezone || 0);
 
     const flights = metadata.flights || [];
-
-    /* For calculating the entire timeframe */
-    const intervals = new Cesium.TimeIntervalCollection();
+    const videos = metadata.videos || [];
 
     for (let i = 0; i < flights.length; i++)
         await Flight.load(flights[i]);
 
-    for (let i = 0; i < metadata.videos.length; i++)
-        await Video.load(metadata.videos[i]);
+    for (let i = 0; i < videos.length; i++)
+        await Video.load(videos[i]);
 
-    Pilot.complete();
-
-    Object.values(state.pilots).forEach(function(pilot) {
-        for (let i = 0; i < pilot.flights.length; i++) {
-            const flight = pilot.flights.get(i).data;
-            intervals.addInterval(flight.interval);
-
-            // TODO: This uses a private API
-            const range = viewer.timeline.addHighlightRange(pilot.color.toCssHexString(), 3, pilot.index * 2);
-            range.setRange(flight.interval.start, flight.interval.stop);
-        }
-
-        for (let i = 0; i < pilot.videos.length; i++) {
-            const video = pilot.videos.get(i).data;
-            intervals.addInterval(video.interval);
-
-            // TODO: This uses a private API
-            const range = viewer.timeline.addHighlightRange(pilot.color.toCssHexString(), 3, pilot.index * 2 + 5);
-            range.setRange(video.interval.start, video.interval.stop);
-        }
-    });
+    /* Switch to the first named pilot */
+    const name = Object.keys(state.pilots).filter((n) => n).at(0);
+    if (name)
+        Pilot.change(state.pilots[name]);
 
     /* Set up the timeline */
-    if (intervals.length) {
-        viewer.clock.startTime = intervals.start.clone();
-        viewer.clock.stopTime = intervals.stop.clone();
-        viewer.clock.currentTime = intervals.start.clone();
-        viewer.timeline.zoomTo(intervals.start, intervals.stop);
+    if (state.intervals.length) {
+        viewer.clock.startTime = state.intervals.start.clone();
+        viewer.clock.stopTime = state.intervals.stop.clone();
+        viewer.clock.currentTime = state.intervals.start.clone();
         viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
     }
 
@@ -492,8 +591,8 @@ function initialize() {
     let currentFlight = null;
     let currentVideo = null;
 
-    /* We initially have a null pilot */
-    Pilot.ensure(null);
+    /* We initially have a any pilot */
+    state.pilot = state.any = Pilot.ensure("");
 
     /* Change the tracked flight */
     function changeFlight(flight) {
@@ -600,11 +699,25 @@ function initialize() {
     }, true);
 
     window.addEventListener("keypress", function(e) {
+        /* Spacebar: pause/play clock */
         if (e.keyCode == 32) {
             viewer.animation.viewModel.pauseViewModel.command();
             viewer.clock.onTick.raiseEvent(viewer.clock);
             e.preventDefault();
             return true;
+
+        /* Delete: delete the object */
+        } else if (e.keyCode == 127) {
+            console.log("delete", currentVideo, currentFlight);
+            if (currentVideo) {
+                const video = currentVideo;
+                changeVideo(null);
+                video.destroy();
+            } else if (currentFlight) {
+                const flight = currentFlight;
+                changeFlight(null);
+                flight.destroy();
+            }
         }
     }, true);
 
@@ -626,25 +739,20 @@ function initialize() {
         return Cesium.JulianDate.toIso8601(offset, 0).slice(11, 16);
     };
 
-    viewer.trackedEntityChanged.addEventListener(function(entity) {
-        // TODO: Do we need this function
-    });
-
     viewer.selectedEntityChanged.addEventListener(function(entity) {
         if (!entity || !entity.data)
             return;
 
         const obj = entity.data;
         const interval = obj.interval;
-        if (!interval || !obj.pilots)
+        if (!interval || !obj.pilot)
             return;
 
         let change = false;
 
         /* Make sure a valid pilot is selected for this entity */
-        assert (state.pilot);
-        if (!obj.pilots.has(state.pilot)) {
-            Pilot.change(obj.pilots.keys().next().value);
+        if (state.pilot != obj.pilot) {
+            Pilot.change(obj.pilot);
             change = true;
         }
 
@@ -665,14 +773,19 @@ function initialize() {
 
     viewer.clock.onTick.addEventListener(function(clock) {
         const pilot = state.pilot;
-        if (!pilot)
-            return;
+        const any = state.any;
 
         /* The flight and video we should be on */
         const fint = pilot.flights.findIntervalContainingDate(clock.currentTime);
         const flight = fint ? fint.data : null;
-        const vint = pilot.videos.findIntervalContainingDate(clock.currentTime);
-        const video = vint ? vint.data : null;
+        let vint = pilot.videos.findIntervalContainingDate(clock.currentTime);
+        let video = vint ? vint.data : null;
+
+        /* Look for videos on the any pilot */
+        if (!video && pilot != any) {
+            vint = any.videos.findIntervalContainingDate(clock.currentTime);
+            video = vint ? vint.data : null;
+        }
 
         if (flight != currentFlight)
             changeFlight(flight);
