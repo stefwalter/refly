@@ -227,23 +227,29 @@ Flight.load = async function loadFlight(filename) {
 }
 
 class Video {
-    constructor(videoData) {
-        const element = document.createElement("video");
-        element.setAttribute("loop", "false");
-        element.setAttribute("hidden", "hidden");
-        const source = document.createElement('source');
+    constructor(videoData, isImage) {
+        const element = document.createElement(isImage ? "div" : "video");
+        element.setAttribute("class", "content");
+        element.style.visibility = "hidden";
+
+        const source = document.createElement(isImage ? 'img' : 'source');
         // TODO: Validate source
         source.setAttribute('src', videoData.filename);
         element.appendChild(source);
+
+        /* Special code for the video */
+        if (element.pause) {
+            element.setAttribute("loop", "false");
+            element.setAttribute("preload", "auto");
+            element.addEventListener("waiting", function(e) {
+                console.log("Video waiting", videoData.filename);
+            });
+
+            element.addEventListener("seeking", function(e) {
+                console.log("Video seeking", videoData.filename);
+            });
+        }
         document.body.appendChild(element);
-
-        element.addEventListener("waiting", function(e) {
-            console.log("Video waiting", videoData.filename);
-        });
-
-        element.addEventListener("seeking", function(e) {
-            console.log("Video seeking", videoData.filename);
-        });
 
         // TODO: Validate dates
         const start = parseJulianDate(videoData.timestamp);
@@ -289,12 +295,16 @@ class Video {
     }
 
     start() {
-        this.element.hidden = false;
-        this.synchronizer = new Cesium.VideoSynchronizer({
-            clock: viewer.clock,
-            element: this.element,
-            epoch: this.interval.start,
-        });
+        this.element.style.visibility = "visible";
+
+        /* If this is a <video>, do a synchronizer */
+        if (this.element.pause) {
+            this.synchronizer = new Cesium.VideoSynchronizer({
+                clock: viewer.clock,
+                element: this.element,
+                epoch: this.interval.start,
+            });
+        }
 
         /* Store the old rate */
         state.rate = viewer.clock.multiplier;
@@ -308,16 +318,17 @@ class Video {
             this.synchronizer = null;
         }
 
-        this.element.hidden = true;
-        this.element.pause();
+        this.element.style.visibility = "hidden";
+        if (this.element.pause)
+            this.element.pause();
         viewer.clock.multiplier = state.rate;
     }
 };
 
-Video.load = function loadVideo(videoData) {
+Video.load = function loadVideo(videoData, isImage) {
     // TODO: Put all the validation here
-    return new Video(videoData);
-}
+    return new Video(videoData, isImage);
+};
 
 class Pilot {
     constructor(name) {
@@ -409,7 +420,11 @@ async function load() {
         await Flight.load(flights[i]);
 
     for (let i = 0; i < metadata.videos.length; i++)
-        await Video.load(metadata.videos[i]);
+        await Video.load(metadata.videos[i], false);
+
+    /* Images get added to the videos for the pilot */
+    for (let i = 0; i < metadata.images.length; i++)
+        await Video.load(metadata.images[i], true);
 
     Pilot.complete();
 
