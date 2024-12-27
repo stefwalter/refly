@@ -49,6 +49,7 @@ div.content img {
 
 .cesium-home-button,
 .cesium-sceneModePicker-wrapper,
-.cesium-viewer-geocoderContainer {
+.cesium-viewer-geocoderContainer,
+.cesium-viewer-infoBoxContainer {
     display: none !important;
 }

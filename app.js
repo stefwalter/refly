@@ -13,6 +13,11 @@ const PLAY_BUTTON = 'data:image/svg+xml;utf8,<svg width="32" height="32" version
 
 const viewer = new Cesium.Viewer('cesiumContainer', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
+    selectionIndicator: false,
+    sceneModePicker: false,
+    scene3DOnly: true,
+    projectionPicker: false,
+    baseLayerPicker: false,
 });
 
 const state = {
@@ -206,14 +211,17 @@ class Flight {
 
         /* Used for finding our flight based on the entity/interval */
         interval.data = this;
-        paraglider.flight = this;
-        tracker.flight = this;
+        paraglider.data = this;
+        tracker.data = this;
 
         this.name = name;
         this.paraglider = paraglider;
         this.tracker = tracker;
         this.interval = interval;
+        this.pilots = new Set();
+
         pilot.add(this);
+        assert(this.pilots.has(pilot));
     }
 };
 
@@ -290,8 +298,10 @@ class Video {
         this.interval = interval;
         this.synchronizer = null;
         this.rate = videoData.speed || 1.0;
+        this.pilots = new Set();
 
         pilot.add(this);
+        assert(this.pilots.has(pilot));
     }
 
     start() {
@@ -356,6 +366,11 @@ class Pilot {
         }
 
         intervals.addInterval(obj.interval);
+
+        /* An object can have multiple pilots */
+        assert(obj.pilots);
+        assert(!obj.pilots.has(this));
+        obj.pilots.add(this);
     }
 };
 
@@ -558,6 +573,35 @@ function initialize() {
 
     viewer.trackedEntityChanged.addEventListener(function(entity) {
         // TODO: Do we need this function
+    });
+
+    viewer.selectedEntityChanged.addEventListener(function(entity) {
+        if (!entity || !entity.data)
+            return;
+
+        const obj = entity.data;
+        const interval = obj.interval;
+        if (!interval || !obj.pilots)
+            return;
+
+        let change = false;
+
+        /* Make sure a valid pilot is selected for this entity */
+        assert (state.pilot);
+        if (!obj.pilots.has(state.pilot)) {
+            Pilot.change(obj.pilots.keys().next().value);
+            change = true;
+        }
+
+        /* And jump to the entity */
+        if (!Cesium.TimeInterval.contains(interval, viewer.clock.currentTime)) {
+            viewer.clock.currentTime = interval.start;
+            change = true;
+        }
+
+        /* Start playing if we changed something */
+        if (change)
+            viewer.clock.shouldAnimate = true;
     });
 
     /* Here we store the base playback rate (ie: clock multiplier) */
