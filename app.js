@@ -41,6 +41,9 @@ const state = {
 
     tzOffset: 0,
 
+    /* Sub-folder currently being used */
+    folder: null,
+
     /* Currently being displayed */
     pilot: null,
     any: null,
@@ -325,19 +328,21 @@ class Flight {
 };
 
 Flight.load = async function loadFlight(filename) {
-
-    // TODO: Escape properly
-    // TODO: Hnadle errors
-    const response = await fetch(filename);
-    const data = await response.text();
-
-    let igcData = null;
+    let igcData = { fixes: [ ], pilot: "" };
 
     try {
-        igcData = IGCParser.parse(data);
-    } catch(error) {
+        const response = await fetch(folderPath(filename));
+        if (response.ok) {
+            const data = await response.text();
+            igcData = IGCParser.parse(data);
+        } else {
+            if (response.status == 404)
+                warning("IGC flight log file not found", filename);
+            else
+                warning("Couldn't load flight log file file", filename, response.status, response.statusText);
+        }
+    } catch (ex) {
         warning("Failure to parse IGC flight log file", filename, ":", error);
-        igcData = { fixes: [ ], pilot: "" };
     }
 
     var flight = new Flight(igcData, filename);
@@ -370,8 +375,7 @@ class Video {
         element.style.visibility = "hidden";
 
         const source = document.createElement(isImage ? 'img' : 'source');
-        // TODO: Validate source
-        source.setAttribute('src', videoData.filename);
+        source.setAttribute('src', folderPath(videoData.filename));
         element.appendChild(source);
 
         /* Special code for the video */
@@ -612,11 +616,20 @@ Pilot.change = function changePilot(pilot) {
     console.log("Pilot", pilot.name);
 }
 
-async function load() {
+function folderPath(path) {
+    if (state.folder)
+        return state.folder + "/" + path;
+    return path
+}
+
+async function load(folder) {
     let metadata = { };
 
+    /* The folder we retrieve all data from */
+    state.folder = folder;
+
     try {
-        const response = await fetch("metadata.json");
+        const response = await fetch(folderPath("metadata.json"));
         if (response.ok) {
             metadata = await response.json();
         } else {
@@ -906,6 +919,18 @@ function initialize() {
                         pilot: state.pilot.name,
                         timestamp: Cesium.JulianDate.toIso8601(viewer.clock.currentTime, 0)
                     });
+
+                /* Here we assume that if no file extension, it's a folder. Shrug */
+                } else if (files[i].name.indexOf(".") < 0) {
+                    // TODO: Perhaps use items[i].webkitGetAsEntry() or similar to determine folder
+                    console.log("Assuming dropped item is a folder", files[i]);
+
+                    /* The location has determines our subfolder, so set that and reload app */
+                    location.hash = files[i].name;
+
+                    /* Yes we ignore any other files */
+                    break;
+
                 } else {
                     warning ("Couldn't load unsupported dropped item:", files[i].name);
                 }
@@ -945,7 +970,14 @@ function initialize() {
         const json = JSON.stringify(data, null, 4);
         ev.clipboardData.setData('text/plain', json);
     });
+
+    /* The hash is our folder, we need to start fresh when it changes */
+    window.addEventListener("hashchange", function(ev) {
+        location.reload();
+    });
 }
 
 initialize();
-load();
+
+/* Load the folder described by the #bookmark in URI */
+load(location.hash ? location.hash.substr(1) : null)
