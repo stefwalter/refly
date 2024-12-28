@@ -36,7 +36,8 @@ app.get('/', function(request, response) {
     "app.js",
     "igc-parser.js",
     "config.js",
-    "index.html"
+    "index.html",
+    "favicon.png",
 ].forEach((filename) => app.get('/' + filename,
     function(request, response) {
         response.sendFile(path.join(__dirname, filename));
