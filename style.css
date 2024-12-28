@@ -59,3 +59,9 @@ div.content img {
 .cesium-viewer-infoBoxContainer {
     display: none !important;
 }
+
+/* Make the timeline highlight more visible, albeit imprecise */
+.cesium-timeline-highlight {
+    border-left: 2px solid white;
+    border-right: 2px solid white;
+}
