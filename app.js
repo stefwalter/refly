@@ -1,3 +1,4 @@
+"use strict";
 
 /* Default playback rate of flights */
 const DEFAULT_RATE = 50;
@@ -55,16 +56,38 @@ const colors = [
     "#3498DB", "#8E44AD", "#9B59B6", "#E74C3C", "#C0392B", "#F39C12", "#D35400",
 ];
 
-function assert() {
+/* Helper to show an error via the Cesium error panel */
+function problem(title, args) {
+    const message = [ ];
+    let error = null;
+    for (let i = 0; i < args.length; i++) {
+        if (args[i].stack)
+            error = args[i].stack;
+        else
+            message.push(String(args[i]));
+    }
+    viewer.cesiumWidget.showErrorPanel(title, message.join(" "), error);
+}
+
+function assert(/* ... */) {
     console.assert.apply(console, arguments);
+
+    if (!arguments[0])
+        problem("Code problem", [ "See javascript console for details" ]);
 }
 
-function failure() {
+function failure(/* ... */) {
     console.error.apply(console, arguments);
+    problem("Failure", arguments);
 }
 
-function warning() {
+function warning(/* ... */) {
     console.warn.apply(console, arguments);
+    problem("Warning", arguments);
+}
+
+function message(/* ... */) {
+    console.info.apply(console, arguments);
 }
 
 function parseJulianDate(timestamp) {
@@ -102,7 +125,7 @@ function parseDuration(timestamp) {
         const date = Cesium.JulianDate.fromIso8601("1970-01-01T" + timestamp + "Z");
         return Cesium.JulianDate.toDate(date).valueOf() / 1000;
     } catch(e) {
-        warning("Couldn't parse duration:", timestamp, e);
+        warning("Couldn't parse duration in metadata:", timestamp, e);
         return 0;
     }
 }
@@ -313,7 +336,7 @@ Flight.load = async function loadFlight(filename) {
     try {
         igcData = IGCParser.parse(data);
     } catch(error) {
-        warning("Failure to parsing IGC", filename, ":", error);
+        warning("Failure to parse IGC flight log file", filename, ":", error);
         igcData = { fixes: [ ], pilot: "" };
     }
 
@@ -598,12 +621,12 @@ async function load() {
             metadata = await response.json();
         } else {
             if (response.status == 404)
-                warning("no metadata.json, starting blank");
+                message("No metadata.json, starting with a blank screen");
             else
-                warning("couldn't load metadata.json", response.status, response.statusText);
+                warning("Couldn't load metadata.json file", response.status, response.statusText);
         }
     } catch (ex) {
-        warning("couldn't load metadata.json", ex);
+        warning("Couldn't load metadata.json", ex);
     }
 
     /* Number of milliseconds to offset the timestamps */
@@ -884,7 +907,7 @@ function initialize() {
                         timestamp: Cesium.JulianDate.toIso8601(viewer.clock.currentTime, 0)
                     });
                 } else {
-                    warning ("Couldn't load unsupported file:", files[i].name);
+                    warning ("Couldn't load unsupported dropped item:", files[i].name);
                 }
 
                 if (promise) {
