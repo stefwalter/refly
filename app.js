@@ -421,7 +421,7 @@ class Video {
             that.interval = interval;
 
             if (!pilot.add(that)) {
-                reject(new Error("Cannot add overlapping or duplicate video: " + this.name));
+                reject(new Error("Cannot add overlapping or duplicate video: " + that.name));
                 return;
             }
             assert(that.pilot == pilot);
