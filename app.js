@@ -974,6 +974,7 @@ function initialize() {
         const data = {
             flights: [],
             videos: [],
+            timezone: state.timeZone,
         };
 
         Object.values(state.pilots).forEach(function(pilot) {
