@@ -795,39 +795,25 @@ function initialize() {
         viewer.clock.onTick.raiseEvent(viewer.clock);
     });
 
-    let tabDown = false;
-
     window.addEventListener("keydown", function(e) {
-        /* The tab key */
-        if (e.keyCode == 9) {
-            tabDown = true;
+        /* PageUp and Page Down */
+        if (e.keyCode == 33 || e.keyCode == 34) {
+            if (e.keyCode == 33)
+                Pilot.change(state.pilot.prev);
+            else
+                Pilot.change(state.pilot.next);
+        }
 
         /* Left or Right arrow keys */
-        } else if (e.keyCode == 37 || e.keyCode == 39) {
+        else if (e.keyCode == 37 || e.keyCode == 39) {
             const direction = e.keyCode == 37 ? -1 : 1;
             const jump = new Cesium.JulianDate(0, 0, Cesium.TimeStandard.UTC);
             Cesium.JulianDate.addSeconds(viewer.clock.currentTime,
                 JUMP_SECONDS * direction * Math.abs(viewer.clock.multiplier), jump);
             viewer.clock.currentTime = jump;
         }
+
         viewer.clock.onTick.raiseEvent(viewer.clock);
-    }, true);
-
-    window.addEventListener("blur", function(e) {
-        if (e.target == window)
-            tabDown = false;
-    }, true);
-
-    window.addEventListener("keyup", function(e) {
-        if (e.keyCode == 9 && tabDown && state.pilot) {
-            if (e.shiftKey)
-                Pilot.change(state.pilot.prev);
-            else
-                Pilot.change(state.pilot.next);
-            viewer.clock.onTick.raiseEvent(viewer.clock);
-            e.preventDefault();
-            return true;
-        }
     }, true);
 
     window.addEventListener("keypress", function(e) {
