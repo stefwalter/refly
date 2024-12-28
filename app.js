@@ -298,8 +298,7 @@ class Flight {
         this.tracker = tracker;
         this.interval = interval;
 
-        if (!pilot.add(this))
-            throw Error("Cannot add overlapping or duplicate flight: " + this.name);
+        pilot.add(this);
         assert(this.pilot == pilot);
 
         // TODO: This uses a private API
@@ -414,16 +413,13 @@ class Video {
 
             const interval = new Cesium.TimeInterval({
                 start: start,
-                stop: stop
+                stop: stop,
             });
 
             interval.data = that;
             that.interval = interval;
 
-            if (!pilot.add(that)) {
-                reject(new Error("Cannot add overlapping or duplicate video: " + that.name));
-                return;
-            }
+            pilot.add(that);
             assert(that.pilot == pilot);
 
             // TODO: This uses a private API
@@ -584,9 +580,6 @@ class Pilot {
 
         /* Two interval collections depending on the type */
         const intervals = obj instanceof Flight ? this.flights : this.videos;
-        if (intervals.indexOf(obj.interval.start) >= 0 ||
-            intervals.indexOf(obj.interval.stop) >= 0)
-            return false;
 
         /* Make sure this can be called multiple times */
         intervals.removeInterval(obj.interval);
@@ -596,7 +589,6 @@ class Pilot {
         state.intervals.addInterval(obj.interval);
 
         obj.pilot = this;
-        return true;
     }
 
     remove(obj) {
@@ -802,36 +794,73 @@ function initialize() {
                 Pilot.change(state.pilot.prev);
             else
                 Pilot.change(state.pilot.next);
-        }
 
-        /* Left or Right arrow keys */
-        else if (e.keyCode == 37 || e.keyCode == 39) {
+        /* Ctrl-Left or Ctrl-Right arrow keys */
+        } else if (e.ctrlKey && (e.keyCode == 37 || e.keyCode == 39)) {
+            if (!state.intervals.length)
+                return;
+
+            const left = e.keyCode == 37;
+            const current = viewer.clock.currentTime;
+            const extra = viewer.clock.multiplier > 0 ? -0.001 : 0.001;
+
+            const jump = new Cesium.JulianDate(0, 0, Cesium.TimeStandard.UTC);
+            let index = state.intervals.indexOf(current);
+            let interval = null;
+
+            /* Are we already at the start of an interval? */
+            if (index >= 0) {
+                interval = state.intervals.get(index);
+                if (left && Cesium.JulianDate.equals(current, interval.start)) {
+                    index = ~index;
+                    console.log("treating start as no interval", index);
+                } 
+                else if (!left && Cesium.JulianDate.equals(current, interval.stop)) {
+                    index = ~(index + 1);
+                    console.log("treating stop as no interval", index);
+                }
+            }
+
+            /* Are we in an interval? */
+            if (index >= 0) {
+                interval = state.intervals.get(index);
+                console.log("jumping to", left ? "start" : "stop", interval, index, state.intervals.length);
+                if (interval) {
+                    Cesium.JulianDate.clone(left ? interval.start : interval.stop, jump);
+                    Cesium.JulianDate.addSeconds(jump, left ? extra : -extra, jump);
+                }
+
+            /* Outside of a video jumping backwards */
+            } else if (left) {
+                interval = state.intervals.get(~index - 1);
+                console.log("jumping to prev", interval, ~index - 1, state.intervals.length);
+                if (interval) {
+                    Cesium.JulianDate.clone(interval.start, jump);
+                    Cesium.JulianDate.addSeconds(jump, -extra, jump);
+                }
+
+            /* Outside of a video jumping forwards */
+            } else {
+                interval = state.intervals.get(~index);
+                console.log("jumping to next", interval, ~index, state.intervals.length);
+                if (interval) {
+                    Cesium.JulianDate.clone(interval.stop, jump);
+                    Cesium.JulianDate.addSeconds(jump, extra, jump);
+                }
+            }
+
+            if (interval) {
+                viewer.clock.currentTime = jump;
+                viewer.clock.onTick.raiseEvent(viewer.clock);
+            }
+
+        } else if (e.keyCode == 37 || e.keyCode == 39) {
             const left = e.keyCode == 37;
             const current = viewer.clock.currentTime;
             const jump = new Cesium.JulianDate(0, 0, Cesium.TimeStandard.UTC);
 
             Cesium.JulianDate.addSeconds(current,
                 JUMP_SECONDS * (left ? -1 : 1) * Math.abs(viewer.clock.multiplier), jump);
-
-            /* Jump to boundary of interval if present */
-            let interval = null;
-            if (currentFlight)
-                interval = currentFlight.interval;
-            if (currentVideo)
-                interval = currentVideo.interval;
-            if (interval) {
-                if (left) {
-                    if (!Cesium.JulianDate.equals(current, interval.start) &&
-                        Cesium.JulianDate.lessThan(jump, interval.start)) {
-                        Cesium.JulianDate.clone(interval.start, jump);
-                    }
-                } else {
-                    if (!Cesium.JulianDate.equals(current, interval.stop) &&
-                        Cesium.JulianDate.greaterThan(jump, interval.stop)) {
-                        Cesium.JulianDate.clone(interval.stop, jump);
-                    }
-                }
-            }
 
             let expanded = false;
             if (left) {
@@ -850,6 +879,7 @@ function initialize() {
                 viewer.timeline.zoomTo(viewer.clock.startTime, viewer.clock.stopTime);
 
             viewer.clock.currentTime = jump;
+            viewer.clock.onTick.raiseEvent(viewer.clock);
         }
 
         viewer.clock.onTick.raiseEvent(viewer.clock);
