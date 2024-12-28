@@ -319,16 +319,14 @@ class Flight {
         viewer.timeline.resize();
 
         while (this.entities && this.entities.length) {
-            let entity = this.entitities.pop();
+            let entity = this.entities.pop();
             viewer.entities.remove(entity);
             entity.data = null;
         }
         this.entities = null;
 
         /* These entities are removed above */
-        this.paraglider.data = null;
         this.paraglider = null;
-        this.tracker.data = null;
         this.tracker = null;
 
         this.pilot.remove(this);
@@ -371,7 +369,7 @@ class Video {
         this.rate = 1;
         this.synchronizer = null;
         this.element = null;
-        this.billboard = null;
+        this.entities = [ ];
     }
 
     save() {
@@ -437,7 +435,10 @@ class Video {
             that.range.setRange(interval.start, interval.stop);
 
             viewer.timeline.zoomTo(state.intervals.start, state.intervals.stop);
+            resolve();
         }
+
+        that.entities = [ ];
 
         /* Find a flight that overlaps this video's start */
         const flight = pilot.flights.findDataForIntervalContainingDate(start);
@@ -445,7 +446,7 @@ class Video {
             const position = flight.paraglider.position.getValue(start);
 
             const datauri = PLAY_BUTTON.replace("black", pilot.color.toCssHexString()).replace('#', '%23');
-            that.billboard = viewer.entities.add({
+            const billboard = viewer.entities.add({
                 position: position,
                 billboard: {
                     image: datauri,
@@ -454,7 +455,8 @@ class Video {
                 },
             });
 
-            that.billboard.data = that;
+            billboard.data = that;
+            that.entities.push(billboard);
         }
 
         that.element = element;
@@ -493,11 +495,12 @@ class Video {
         document.body.removeChild(this.element);
         this.element.data = null;
 
-        if (this.billboard) {
-            viewer.entities.remove(this.billboard);
-            this.billboard.data = null;
-            this.billboard = null;
+        while (this.entities && this.entities.length) {
+            let entity = this.entities.pop();
+            viewer.entities.remove(entity);
+            entity.data = null;
         }
+        this.entities = null;
 
         // TODO: This uses private API
         assert(this.range);
@@ -679,9 +682,6 @@ async function load(folder) {
 function loaded(last) {
     let current = null;
 
-    if (last)
-        current = last.interval.start;
-
     /* Set up the timeline */
     if (state.intervals.length) {
         viewer.clock.startTime = state.intervals.start.clone();
@@ -690,17 +690,31 @@ function loaded(last) {
         current = state.intervals.start;
     }
 
+    if (last)
+        current = last.interval.start;
+
     if (current)
         viewer.clock.currentTime = current.clone();
 
+    let entities = [];
+
+    /* Fly to the item that was dropped */
     if (last) {
-        viewer.flyTo(last.entities);
+        Pilot.change(last.pilot);
         viewer.camera.position = DEFAULT_VIEW;
+        entities = last.entities;
 
     } else if (viewer.entities.values.length) {
-        viewer.flyTo(viewer.entities);
         viewer.camera.position = DEFAULT_VIEW;
+        entities = viewer.entities;
     }
+
+    /* Do this after onTick */
+    window.setTimeout(function() {
+        viewer.flyTo(entities || [])
+            .then((res) => console.log("flew", res))
+            .catch((ex) => console.error("flew", ex));
+    }, 0);
 }
 
 function initialize() {
