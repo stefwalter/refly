@@ -363,7 +363,6 @@ class Video {
     constructor(videoData) {
         this.name = this.filename = videoData.filename;
         this.videoData = videoData;
-        this.rate = 1;
         this.synchronizer = null;
         this.element = null;
         this.entities = [ ];
@@ -523,9 +522,9 @@ class Video {
         }
 
         /* Store the old rate */
-        state.rate = viewer.clock.multiplier;
-        const direction = state.rate < 0 ? -1 : 1;
-        viewer.clock.multiplier = this.rate * direction;
+        state.rate = Math.abs(viewer.clock.multiplier);
+        const direction = viewer.clock.multiplier < 0 ? -1 : 1;
+        viewer.clock.multiplier = direction;
     }
 
     stop() {
@@ -537,7 +536,8 @@ class Video {
         this.element.style.visibility = "hidden";
         if (this.element.pause)
             this.element.pause();
-        viewer.clock.multiplier = state.rate;
+        const direction = viewer.clock.multiplier < 0 ? -1 : 1;
+        viewer.clock.multiplier = state.rate * direction;
     }
 };
 
