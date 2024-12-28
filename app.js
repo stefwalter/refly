@@ -806,10 +806,49 @@ function initialize() {
 
         /* Left or Right arrow keys */
         else if (e.keyCode == 37 || e.keyCode == 39) {
-            const direction = e.keyCode == 37 ? -1 : 1;
+            const left = e.keyCode == 37;
+            const current = viewer.clock.currentTime;
             const jump = new Cesium.JulianDate(0, 0, Cesium.TimeStandard.UTC);
-            Cesium.JulianDate.addSeconds(viewer.clock.currentTime,
-                JUMP_SECONDS * direction * Math.abs(viewer.clock.multiplier), jump);
+
+            Cesium.JulianDate.addSeconds(current,
+                JUMP_SECONDS * (left ? -1 : 1) * Math.abs(viewer.clock.multiplier), jump);
+
+            /* Jump to boundary of interval if present */
+            let interval = null;
+            if (currentFlight)
+                interval = currentFlight.interval;
+            if (currentVideo)
+                interval = currentVideo.interval;
+            if (interval) {
+                if (left) {
+                    if (!Cesium.JulianDate.equals(current, interval.start) &&
+                        Cesium.JulianDate.lessThan(jump, interval.start)) {
+                        Cesium.JulianDate.clone(interval.start, jump);
+                    }
+                } else {
+                    if (!Cesium.JulianDate.equals(current, interval.stop) &&
+                        Cesium.JulianDate.greaterThan(jump, interval.stop)) {
+                        Cesium.JulianDate.clone(interval.stop, jump);
+                    }
+                }
+            }
+
+            let expanded = false;
+            if (left) {
+                if (Cesium.JulianDate.lessThan(jump, viewer.clock.startTime)) {
+                    viewer.clock.startTime = jump.clone();
+                    expanded = true;
+                }
+            } else {
+                if (Cesium.JulianDate.greaterThan(jump, viewer.clock.stopTime)) {
+                    viewer.clock.stopTime = jump.clone();
+                    expanded = true;
+                }
+            }
+
+            if (expanded)
+                viewer.timeline.zoomTo(viewer.clock.startTime, viewer.clock.stopTime);
+
             viewer.clock.currentTime = jump;
         }
 
