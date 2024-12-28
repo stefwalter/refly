@@ -39,7 +39,8 @@ const state = {
     /* The entire set of intervals for the timeline */
     intervals: new Cesium.TimeIntervalCollection(),
 
-    tzOffset: 0,
+    /* Timezone offset in seconds from UTC */
+    timeZone: 0,
 
     /* Sub-folder currently being used */
     folder: null,
@@ -106,8 +107,8 @@ function parseJulianDate(timestamp) {
 
 /* Returns the timezone offset in Seconds */
 function parseTimeZone(timestamp) {
-    if (!timestamp)
-        return 0;
+    if (!timestamp) /* No timezone set? Then current browser timezone */
+        return -(new Date("1970-01-01T00:00:00").valueOf()) / 1000;
     if (typeof timestamp == 'number')
         return timestamp * 60; // Minutes offset
     if (typeof timestamp == 'string') {
@@ -656,7 +657,7 @@ async function load(folder) {
     }
 
     /* Number of milliseconds to offset the timestamps */
-    state.tzOffset = parseTimeZone(metadata.timezone || 0);
+    state.timeZone = parseTimeZone(metadata.timezone);
 
     const flights = metadata.flights || [];
     const videos = metadata.videos || [];
@@ -838,19 +839,19 @@ function initialize() {
 
     viewer.animation.viewModel.dateFormatter = function(date, viewModel) {
         const offset = new Cesium.JulianDate();
-        Cesium.JulianDate.addSeconds(date, state.tzOffset, offset);
+        Cesium.JulianDate.addSeconds(date, state.displayTimeZone, offset);
         return Cesium.JulianDate.toIso8601(offset, 0).slice(0, 10);
     };
 
     viewer.animation.viewModel.timeFormatter = function(date, viewModel) {
         const offset = new Cesium.JulianDate();
-        Cesium.JulianDate.addSeconds(date, state.tzOffset, offset);
+        Cesium.JulianDate.addSeconds(date, state.timeZone, offset);
         return Cesium.JulianDate.toIso8601(offset, 0).slice(11, 19);
     };
 
     viewer.timeline.makeLabel = function(date) {
         const offset = new Cesium.JulianDate();
-        Cesium.JulianDate.addSeconds(date, state.tzOffset, offset);
+        Cesium.JulianDate.addSeconds(date, state.timeZone, offset);
         return Cesium.JulianDate.toIso8601(offset, 0).slice(11, 16);
     };
 
