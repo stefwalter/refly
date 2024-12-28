@@ -156,6 +156,7 @@ class Flight {
 
         this.paraglider = null;
         this.tracker = null;
+        this.entities = null;
         this.interval = null;
     }
 
@@ -194,8 +195,11 @@ class Flight {
             }
         }
 
+        const entities = [ ];
+        const length = igcData.fixes.length;
+
         // Create a point for each.
-        for (let i = 0; i < igcData.fixes.length; i++) {
+        for (let i = 0; i < length; i++) {
             const fix = igcData.fixes[i];
 
             // const altitude = (fix.gpsAltitude + fix.pressureAltitude) / 2;
@@ -203,25 +207,27 @@ class Flight {
             const altitude = fix.gpsAltitude - 70;
             const position = Cesium.Cartesian3.fromDegrees(fix.longitude, fix.latitude, altitude);
 
+            /*
+             * The starting, stopping point, an invisible marker.
+             * To debug, trace entire track just change condition and pixelSize
+             */
+            if (i == 0 || i == length - 1) {
+                entities.push(viewer.entities.add({
+                    position: position,
+                    point: { pixelSize: 0, color: Cesium.Color.BLUE }
+                }));
+            }
+
             paragliderPositions.addSample(time, position);
 
             trackerStack.push({ position: position, time: time });
             Cesium.Cartesian3.add(trackerCartesian, position, trackerCartesian);
             updateTracker();
 
-            /*
-             * Example code for tracing the entire track
-             *
-             * const point = viewer.entities.add({
-             *   description: `Location: (${fix.longitude}, ${fix.latitude}, ${altitude})`,
-             *   position: position,
-             *   point: { pixelSize: 10, color: Cesium.Color.RED }
-             *});
-             */
-
             startTime = startTime || time;
             endTime = time;
         }
+
 
         /* Update the remaining average position of the tracker */
         while (trackerStack.length > 0)
@@ -284,7 +290,9 @@ class Flight {
         interval.data = this;
         paraglider.data = this;
         tracker.data = this;
+        entities.push(paraglider, tracker);
 
+        this.entities = entities;
         this.paraglider = paraglider;
         this.tracker = tracker;
         this.interval = interval;
@@ -309,11 +317,16 @@ class Flight {
         this.range = null;
         viewer.timeline.resize();
 
-        viewer.entities.remove(this.paraglider);
+        while (this.entities && this.entities.length) {
+            let entity = this.entitities.pop();
+            viewer.entities.remove(entity);
+            entity.data = null;
+        }
+        this.entities = null;
+
+        /* These entities are removed above */
         this.paraglider.data = null;
         this.paraglider = null;
-
-        viewer.entities.remove(this.tracker);
         this.tracker.data = null;
         this.tracker = null;
 
@@ -665,10 +678,8 @@ async function load(folder) {
 function loaded(last) {
     let current = null;
 
-    if (last) {
-        console.log(last);
+    if (last)
         current = last.interval.start;
-    }
 
     /* Set up the timeline */
     if (state.intervals.length) {
@@ -681,8 +692,11 @@ function loaded(last) {
     if (current)
         viewer.clock.currentTime = current.clone();
 
-    /* Set up the default camera */
-    if (viewer.entities.length) {
+    if (last) {
+        viewer.flyTo(last.entities);
+        viewer.camera.position = DEFAULT_VIEW;
+
+    } else if (viewer.entities.values.length) {
         viewer.flyTo(viewer.entities);
         viewer.camera.position = DEFAULT_VIEW;
     }
