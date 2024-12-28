@@ -307,8 +307,6 @@ class Flight {
         this.range = viewer.timeline.addHighlightRange(pilot.color.toCssHexString(),
             3, pilot.index * 2);
         this.range.setRange(interval.start, interval.stop);
-
-        viewer.timeline.zoomTo(state.intervals.start, state.intervals.stop);
     }
 
     destroy() {
@@ -434,7 +432,6 @@ class Video {
                 3, pilot.index * 2 + 5);
             that.range.setRange(interval.start, interval.stop);
 
-            viewer.timeline.zoomTo(state.intervals.start, state.intervals.stop);
             resolve();
         }
 
@@ -687,6 +684,7 @@ function loaded(last) {
         viewer.clock.startTime = state.intervals.start.clone();
         viewer.clock.stopTime = state.intervals.stop.clone();
         viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
+        viewer.timeline.zoomTo(state.intervals.start, state.intervals.stop);
         current = state.intervals.start;
     }
 
@@ -720,25 +718,29 @@ function loaded(last) {
 function initialize() {
     let currentFlight = null;
     let currentVideo = null;
+    let currentPosition = null;
 
     /* We initially have a any pilot */
     state.pilot = state.any = Pilot.ensure("");
 
     /* Change the tracked flight */
     function changeFlight(flight) {
-        const position = viewer.camera.position.clone();
-        viewer.trackedEntity = flight ? flight.tracker : null;
+        if (viewer.trackedEntity) {
+            currentPosition = viewer.camera.position.clone();
+            if (!currentPosition.x || !currentPosition.y || !currentPosition.z)
+                currentPosition = null;
+        }
+
+        if (flight && flight.tracker) {
+            if (currentPosition)
+                flight.tracker.viewFrom = currentPosition;
+            viewer.trackedEntity = flight.tracker;
+        } else {
+            viewer.trackedEntity = null;
+        }
 
         const old = currentFlight ? currentFlight.name : null;
         currentFlight = flight;
-
-        /* Note that we keep the pilot, even when setting null flight */
-        if (flight) {
-            if (old) {
-                viewer.camera.position = position;
-                flight.tracker.viewFrom = position;
-            }
-        }
 
         console.log("Flight", old, "->", flight ? flight.name : null);
     }
@@ -917,8 +919,11 @@ function initialize() {
             video = vint ? vint.data : null;
         }
 
+        /* Do we need to change the flight, or clear it? */
         if (flight != currentFlight)
             changeFlight(flight);
+
+        /* Do we need to change the video, or clear it? */
         if (video != currentVideo)
             changeVideo(video);
     });
