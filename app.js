@@ -51,7 +51,6 @@ const state = {
     /* Currently being displayed */
     pilot: null,
     any: null,
-    rate: DEFAULT_RATE,
 };
 
 /* For Javascript console debugging */
@@ -377,9 +376,12 @@ class Video {
     constructor(videoData) {
         this.name = this.filename = videoData.filename;
         this.videoData = videoData;
-        this.synchronizer = null;
         this.element = null;
         this.entities = [ ];
+        this.rate = 1;
+
+        this.ticker = null;
+        this.originalRate = null;
     }
 
     save() {
@@ -390,8 +392,15 @@ class Video {
     create() {
         const that = this;
         const videoData = that.videoData;
-        const isImage = !!assumeFileType(videoData.filename, IMAGE_EXTS);
 
+        if (videoData.rate) {
+            if (typeof videoData.rate != "number" || videoData.rate <= 0)
+                warning("Invalid rate for video:", videoData.rate);
+            else
+                that.rate = videoData.rate;
+        }
+
+        const isImage = !!assumeFileType(videoData.filename, IMAGE_EXTS);
         const element = document.createElement(isImage ? "div" : "video");
         element.setAttribute("class", "content");
         element.style.visibility = "hidden";
@@ -405,11 +414,11 @@ class Video {
             element.setAttribute("loop", "false");
             element.setAttribute("preload", "metadata");
             element.addEventListener("waiting", function(e) {
-                console.log("Video waiting", videoData.filename);
+                console.log("Waiting", videoData.filename);
             });
 
             element.addEventListener("seeking", function(e) {
-                console.log("Video seeking", videoData.filename);
+                console.log("Seeking", videoData.filename);
             });
         }
         document.body.appendChild(element);
@@ -422,7 +431,7 @@ class Video {
         function completeVideo(resolve, reject) {
             const duration = parseDuration(videoData.duration) || DEFAULT_DURATION;
             const stop = start.clone();
-            Cesium.JulianDate.addSeconds(start, duration, stop);
+            Cesium.JulianDate.addSeconds(start, duration * that.rate, stop);
 
             const interval = new Cesium.TimeInterval({
                 start: start,
@@ -486,7 +495,6 @@ class Video {
 
         that.element = element;
         that.element.data = that;
-        that.synchronizer = null;
 
         return new Promise((resolve, reject) => {
             if (isImage || videoData.duration) {
@@ -514,7 +522,6 @@ class Video {
 
     destroy() {
         this.stop();
-        assert(!this.synchronizer);
 
         assert(this.element);
         document.body.removeChild(this.element);
@@ -543,34 +550,52 @@ class Video {
     }
 
     start() {
-        this.element.style.visibility = "visible";
+        const element = this.element;
+        const interval = this.interval;
+        const clock = viewer.clock;
+        const rate = this.rate;
+        const name = this.name;
 
-        /* If this is a <video>, do a synchronizer */
-        if (this.element.pause) {
-            this.synchronizer = new Cesium.VideoSynchronizer({
-                clock: viewer.clock,
-                element: this.element,
-                epoch: this.interval.start,
-            });
+        function syncVideo() {
+            const at = Cesium.JulianDate.secondsDifference(clock.currentTime, interval.start) / rate;
+            if (!Cesium.Math.equalsEpsilon(at, element.currentTime, Cesium.Math.EPSILON1, 1)) {
+                console.log("Syncing", name, element.currentTime, "->", at);
+                element.currentTime = at;
+            }
+
+            const direction = clock.multiplier < 0 ? 0.1 : 1;
+            if (direction != element.playbackRate)
+                element.playbackRate = direction;
+
+            if (clock.shouldAnimate && element.paused)
+                element.play();
+            else if (!clock.shouldAnimate && !element.paused)
+                element.pause();
         }
 
-        /* Store the old rate */
-        state.rate = Math.abs(viewer.clock.multiplier);
         const direction = viewer.clock.multiplier < 0 ? -1 : 1;
-        viewer.clock.multiplier = direction;
+        this.originalRate = viewer.clock.multiplier;
+        viewer.clock.multiplier = rate * direction;
+
+        /* If this is a <video>, do a synchronizer */
+        if (this.element.play) {
+            this.ticker = viewer.clock.onTick.addEventListener(syncVideo);
+            syncVideo(true);
+        }
+
+        /* Actually show the video */
+        this.element.style.visibility = "visible";
     }
 
     stop() {
-        if (this.synchronizer) {
-            this.synchronizer.destroy();
-            this.synchronizer = null;
-        }
-
         this.element.style.visibility = "hidden";
+        if (this.ticker)
+            this.ticker(); /* Remove the onTick handler */
+        this.ticker = null;
         if (this.element.pause)
             this.element.pause();
-        const direction = viewer.clock.multiplier < 0 ? -1 : 1;
-        viewer.clock.multiplier = state.rate * direction;
+        var direction = viewer.clock.multiplier < 0 ? -1 : 1;
+        viewer.clock.multiplier = Math.abs(this.originalRate) * direction;
     }
 };
 
@@ -727,8 +752,10 @@ function loaded(last) {
     /* Fly to the item that was dropped */
     if (last) {
         Pilot.change(last.pilot);
-        viewer.camera.position = DEFAULT_VIEW;
-        entities = last.entities;
+        if (last instanceof Flight) {
+            viewer.camera.position = DEFAULT_VIEW;
+            entities = last.entities;
+        }
 
     } else if (viewer.entities.values.length) {
         viewer.camera.position = DEFAULT_VIEW;
