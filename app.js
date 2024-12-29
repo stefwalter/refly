@@ -801,8 +801,7 @@ function loaded(last) {
     /* Do this after onTick */
     window.setTimeout(function() {
         viewer.flyTo(entities || [])
-            .then((res) => console.log("flew", res))
-            .catch((ex) => console.error("flew", ex));
+            .catch((ex) => console.error("Couldn't fly", ex));
     }, 0);
 }
 
