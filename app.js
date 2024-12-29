@@ -1199,7 +1199,7 @@ function initialize() {
         return {
             latitude: Cesium.Math.toDegrees(cartographic.latitude),
             longitude: Cesium.Math.toDegrees(cartographic.longitude),
-            altitude: cartographic.height
+            altitude: Math.max(0, cartographic.height)
         };
     }
 
