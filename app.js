@@ -24,6 +24,10 @@ const IGC_EXTS = [ '.igc' ];
 /* Video extensions */
 const VIDEO_EXTS = [ '.mp4', '.mov' ];
 
+/* Ticks for the playback rate dial */
+const DIAL_TICKS = [ 0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 8.0, 10.0, 12.0, 15.0, 16.0,
+  20.0, 25.0, 30.0, 40.0, 50.0, 75.0, 100.0, 200.0, 300.0, 500.0, 1000.0 ];
+
 const viewer = new Cesium.Viewer('cesiumContainer', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
     selectionIndicator: false,
@@ -548,6 +552,7 @@ class Video {
     }
 
     start() {
+        const videoData = this.videoData;
         const element = this.element;
         const interval = this.interval;
         const clock = viewer.clock;
@@ -555,6 +560,11 @@ class Video {
         const name = this.name;
 
         function syncVideo() {
+
+            /* Changing the rate during video play changes the metadata of the rate */
+            // TODO: We should be updating all the intervals for this video. Hard
+            videoData.rate = Math.abs(clock.multiplier);
+
             const at = Cesium.JulianDate.secondsDifference(clock.currentTime, interval.start) / rate;
             if (!Cesium.Math.equalsEpsilon(at, element.currentTime, Cesium.Math.EPSILON1, 1)) {
                 console.log("Syncing", name, element.currentTime, "->", at);
@@ -801,6 +811,9 @@ function initialize() {
     let currentVideo = null;
     let trackedPosition = new Cesium.Cartesian3(0, 0, 0);
     let trackedCamera = Cesium.Cartesian3.clone(DEFAULT_VIEW);
+
+    /* Our ticks are also good defaults for video rate */
+    viewer.animation.viewModel.setShuttleRingTicks(DIAL_TICKS);
 
     /* We initially have a any pilot */
     Pilot.change(state.any = Pilot.ensure(""));
