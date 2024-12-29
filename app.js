@@ -446,11 +446,34 @@ class Video {
 
         that.entities = [ ];
 
-        /* Find a flight that overlaps this video's start */
-        const flight = pilot.flights.findDataForIntervalContainingDate(start);
-        if (flight) {
-            const position = flight.paraglider.position.getValue(start);
+        /* The position of the video */
+        let position = null;
 
+        /* These values have to be correct or we wont see the video billboard. Shrug */
+        if (videoData.longitude || videoData.latitude || videoData.altitude) {
+            const longitude = videoData.longitude || 0;
+            const latitude = videoData.latitude || 0;
+            const altitude = videoData.altitude || 0;
+
+            if (typeof longitude != "number" || Math.abs(longitude) > 180 ||
+                typeof latitude != "number" ||  Math.abs(latitude) > 90 ||
+                typeof altitude != "number" || altitude < 0) {
+                warning("Invalid latitude/longitude/altitude position:",
+                    latitude, longitude, altitude);
+            } else {
+                position = Cesium.Cartesian3.fromDegrees(longitude, latitude, altitude);
+            }
+        }
+
+        /* Find a flight that overlaps this video's start */
+        if (!position) {
+            const flight = pilot.flights.findDataForIntervalContainingDate(start);
+            if (flight)
+                position = flight.paraglider.position.getValue(start);
+        }
+
+        /* A billboard to see the video */
+        if (position) {
             const datauri = PLAY_BUTTON.replace("black", pilot.color.toCssHexString()).replace('#', '%23');
             const billboard = viewer.entities.add({
                 position: position,
@@ -658,7 +681,7 @@ async function load(folder) {
         warning("Couldn't load metadata.json", ex);
     }
 
-    /* Number of milliseconds to offset the timestamps */
+    /* Number of seconds to offset the timestamps */
     state.timeZone = parseTimeZone(metadata.timezone);
 
     /* Number of seconds to show flight trail behind active spot */
@@ -1004,6 +1027,19 @@ function initialize() {
         return true;
     }
 
+    function pixelToLocation(x, y) {
+        const ray = viewer.camera.getPickRay(new Cesium.Cartesian2(x, y));
+        var cartesian = viewer.scene.globe.pick(ray, viewer.scene);
+        if (!cartesian)
+            return null;
+        const cartographic = viewer.scene.globe.ellipsoid.cartesianToCartographic(cartesian);
+        return {
+            latitude: Cesium.Math.toDegrees(cartographic.latitude),
+            longitude: Cesium.Math.toDegrees(cartographic.longitude),
+            altitude: cartographic.height
+        };
+    }
+
     window.addEventListener("dragover", highlightEvent);
     window.addEventListener("dragenter", highlightEvent);
     window.addEventListener("dragleave", highlightEvent);
@@ -1016,11 +1052,12 @@ function initialize() {
                 if (exts == IGC_EXTS) {
                     promise = Flight.load(files[i].name);
                 } else if (exts) {
-                    promise = Video.load({
+                    const coordinates = currentFlight ? null : pixelToLocation(ev.clientX, ev.clientY);
+                    promise = Video.load(Object.assign({
                         filename: files[i].name,
                         pilot: state.pilot.name,
                         timestamp: Cesium.JulianDate.toIso8601(viewer.clock.currentTime, 0)
-                    });
+                    }, coordinates));
 
                 /* Here we assume that if no file extension, it's a folder. Shrug */
                 } else if (files[i].name.indexOf(".") < 0) {
