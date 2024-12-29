@@ -27,7 +27,7 @@ const VIDEO_EXTS = [ '.mp4', '.mov' ];
 const viewer = new Cesium.Viewer('cesiumContainer', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
     selectionIndicator: false,
-    sceneModePicker: false,
+    geocoder: false,
     scene3DOnly: true,
     projectionPicker: false,
     baseLayerPicker: false,
@@ -675,7 +675,7 @@ Pilot.change = function changePilot(pilot) {
     // Assume that the onTick will change
     state.pilot = pilot;
     const element = document.getElementById("pilot")
-    element.innerText = pilot.name;
+    element.innerText = pilot.name || "Any pilot";
     element.style.color = pilot.color.toCssHexString();
     console.log("Pilot", pilot.name);
 }
@@ -1143,6 +1143,15 @@ function initialize() {
     /* The hash is our folder, we need to start fresh when it changes */
     window.addEventListener("hashchange", function(ev) {
         location.reload();
+    });
+
+    viewer.homeButton.viewModel.command.beforeExecute.addEventListener(function(ev) {
+        ev.cancel = true;
+        viewer.flyTo(viewer.entities || []);
+    });
+
+    document.getElementById("pilot").addEventListener("click", function(ev) {
+        Pilot.change(state.pilot.next);
     });
 }
 

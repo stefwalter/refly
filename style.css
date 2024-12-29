@@ -37,27 +37,23 @@ div.content img {
 
 #pilot {
     position: absolute;
-    bottom: 23px;
-    height: 20pt;
-    right: 8px;
+    top: 5px;
+    right: 80px;
+    height: 20px;
     font-family: sans-serif;
     font-weight: bold;
+    font-size: 12pt;
+    line-height: 16pt;
 }
 
 /* Stuff that displays above videos */
+.cesium-viewer-toolbar,
 .cesium-viewer-animationContainer,
 .cesium-viewer-timelineContainer,
 .cesium-viewer-fullscreenContainer,
 #pilot
 {
     z-index: 20;
-}
-
-.cesium-home-button,
-.cesium-sceneModePicker-wrapper,
-.cesium-viewer-geocoderContainer,
-.cesium-viewer-infoBoxContainer {
-    display: none !important;
 }
 
 /* Make the timeline highlight more visible, albeit imprecise */
