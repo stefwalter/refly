@@ -746,22 +746,18 @@ function loaded(last) {
 function initialize() {
     let currentFlight = null;
     let currentVideo = null;
-    let currentPosition = null;
+    let trackedPosition = new Cesium.Cartesian3(0, 0, 0);
+    let trackedCamera = Cesium.Cartesian3.clone(DEFAULT_VIEW);
 
     /* We initially have a any pilot */
     state.pilot = state.any = Pilot.ensure("");
 
     /* Change the tracked flight */
     function changeFlight(flight) {
-        if (viewer.trackedEntity) {
-            currentPosition = viewer.camera.position.clone();
-            if (!currentPosition.x || !currentPosition.y || !currentPosition.z)
-                currentPosition = null;
-        }
-
         if (flight && flight.tracker) {
-            if (currentPosition)
-                flight.tracker.viewFrom = currentPosition;
+            const viewFrom = new Cesium.Cartesian3.clone(trackedCamera);
+            Cesium.Cartesian3(viewFrom, trackedPosition, viewFrom);
+            flight.tracker.viewFrom = viewFrom;
             viewer.trackedEntity = flight.tracker;
         } else {
             viewer.trackedEntity = null;
@@ -997,6 +993,12 @@ function initialize() {
     viewer.clock.onTick.addEventListener(function(clock) {
         const pilot = state.pilot;
         const any = state.any;
+
+        /* Note the tracked entity's position for use when changing trackers */
+        if (viewer.trackedEntity) {
+            viewer.trackedEntity.position.getValue(clock.currentTime, trackedPosition);
+            Cesium.Cartesian3.clone(viewer.camera.position, trackedCamera);
+        }
 
         /* The flight and video we should be on */
         const fint = pilot.flights.findIntervalContainingDate(clock.currentTime);
