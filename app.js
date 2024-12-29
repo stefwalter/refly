@@ -42,6 +42,9 @@ const state = {
     /* Timezone offset in seconds from UTC */
     timeZone: 0,
 
+    /* Trailing time for drawing flights */
+    trailing: null,
+
     /* Sub-folder currently being used */
     folder: null,
 
@@ -69,7 +72,7 @@ function problem(title, args) {
     const message = [ ];
     let error = null;
     for (let i = 0; i < args.length; i++) {
-        if (args[i].stack)
+        if (args[i] && args[i].stack)
             error = args[i].stack;
         else
             message.push(String(args[i]));
@@ -124,18 +127,21 @@ function parseTimeZone(timestamp) {
 
 /* Returns the duration in seconds */
 function parseDuration(timestamp) {
-    if (!timestamp)
-        return 0;
     if (typeof timestamp == 'number')
         return timestamp; // Numbers are seconds
-    assert(typeof timestamp == "string");
-    try {
-        const date = Cesium.JulianDate.fromIso8601("1970-01-01T" + timestamp + "Z");
-        return Cesium.JulianDate.toDate(date).valueOf() / 1000;
-    } catch(e) {
-        warning("Couldn't parse duration in metadata:", timestamp, e);
-        return 0;
+    if (!timestamp)
+        return undefined;
+    let ex = null;
+    if (typeof timestamp == "string") {
+        try {
+            const date = Cesium.JulianDate.fromIso8601("1970-01-01T" + timestamp + "Z");
+            return Cesium.JulianDate.toDate(date).valueOf() / 1000;
+        } catch(e) {
+            ex = e;
+        }
     }
+    warning("Couldn't parse duration in metadata:", timestamp, ex);
+    return undefined;
 }
 
 /*
@@ -243,9 +249,12 @@ class Flight {
             stop: endTime
         });
 
-        /* Extend flight availability to an hour after landing */
+        /* Extend flight availability by default to 12 hours after landing */
         const extended = endTime.clone();
-        Cesium.JulianDate.addHours(endTime, 1, extended);
+        if (state.trailing)
+            Cesium.JulianDate.addSeconds(endTime, state.trailing, extended);
+        else
+            Cesium.JulianDate.addHours(endTime, 12, extended);
 
         const paraglider = viewer.entities.add({
             availability: new Cesium.TimeIntervalCollection([
@@ -259,6 +268,7 @@ class Flight {
             path: new Cesium.PathGraphics({
                 width: 1,
                 leadTime: 0,
+                trailTime: state.trailing || undefined,
                 material: new Cesium.ColorMaterialProperty(pilot.color)
             })
         });
@@ -650,6 +660,9 @@ async function load(folder) {
 
     /* Number of milliseconds to offset the timestamps */
     state.timeZone = parseTimeZone(metadata.timezone);
+
+    /* Number of seconds to show flight trail behind active spot */
+    state.trailing = parseDuration(metadata.trailing);
 
     const flights = metadata.flights || [];
     const videos = metadata.videos || [];
@@ -1044,6 +1057,7 @@ function initialize() {
             flights: [],
             videos: [],
             timezone: state.timeZone,
+            trailing: state.trailing,
         };
 
         Object.values(state.pilots).forEach(function(pilot) {
