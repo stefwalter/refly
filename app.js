@@ -51,6 +51,9 @@ const state = {
     /* Currently being displayed */
     pilot: null,
     any: null,
+
+    /* Loaded from the client */
+    blobs: { },
 };
 
 /* For Javascript console debugging */
@@ -345,7 +348,7 @@ Flight.load = async function loadFlight(filename) {
     let igcData = { fixes: [ ], pilot: "" };
 
     try {
-        const response = await fetch(folderPath(filename));
+        const response = await fetch(qualifiedUrl(filename));
         if (response.ok) {
             const data = await response.text();
             igcData = IGCParser.parse(data);
@@ -392,13 +395,14 @@ class Video {
                 that.rate = videoData.rate;
         }
 
-        const isImage = !!assumeFileType(videoData.filename, IMAGE_EXTS);
+        const kind = videoData.kind || "";
+        const isImage = !!assumeFileType(videoData.filename, IMAGE_EXTS) || kind.startsWith("image/");
         const element = document.createElement(isImage ? "div" : "video");
         element.setAttribute("class", "content");
         element.style.visibility = "hidden";
 
         const source = document.createElement(isImage ? 'img' : 'source');
-        source.setAttribute('src', folderPath(videoData.filename));
+        source.setAttribute('src', qualifiedUrl(videoData.filename));
         element.appendChild(source);
 
         /* Special code for the video */
@@ -674,10 +678,10 @@ Pilot.change = function changePilot(pilot) {
     console.log("Pilot", pilot.name);
 }
 
-function folderPath(path) {
+function qualifiedUrl(path) {
     if (state.folder)
-        return state.folder + "/" + path;
-    return path
+        path = state.folder + "/" + path;
+    return state.blobs[path] || path;
 }
 
 async function load(folder) {
@@ -687,7 +691,7 @@ async function load(folder) {
     state.folder = folder;
 
     try {
-        const response = await fetch(folderPath("metadata.json"));
+        const response = await fetch(qualifiedUrl("metadata.json"));
         if (response.ok) {
             metadata = await response.json();
         } else {
@@ -716,6 +720,28 @@ async function load(folder) {
         await Video.load(videos[i]);
 
     loaded(null);
+}
+
+function save() {
+    const data = {
+        flights: [],
+        videos: [],
+        timezone: state.timeZone,
+        trailing: state.trailing,
+    };
+
+    Object.values(state.pilots).forEach(function(pilot) {
+        for(let i = 0; i < pilot.flights.length; i++) {
+            const item = pilot.flights.get(i).data.save();
+            data.flights.push(item);
+        }
+        for(let i = 0; i < pilot.videos.length; i++) {
+            const item = pilot.videos.get(i).data.save();
+            data.videos.push(item);
+        }
+    });
+
+    return JSON.stringify(data, null, 4);
 }
 
 function loaded(last) {
@@ -1167,73 +1193,61 @@ function initialize() {
     window.addEventListener("dragover", highlightEvent);
     window.addEventListener("dragenter", highlightEvent);
     window.addEventListener("dragleave", highlightEvent);
-    window.addEventListener("drop", function(ev) {
-        if (ev.dataTransfer && ev.dataTransfer.files) {
-            const files = ev.dataTransfer.files;
-            for (let i = 0; i < files.length; i++) {
-                const exts = assumeFileType(files[i].name, IMAGE_EXTS, IGC_EXTS, VIDEO_EXTS);
-                let promise = null;
-                if (exts == IGC_EXTS) {
-                    promise = Flight.load(files[i].name);
-                } else if (exts) {
-                    const coordinates = currentFlight ? null : pixelToLocation(ev.clientX, ev.clientY);
-                    promise = Video.load(Object.assign({
-                        filename: files[i].name,
-                        pilot: state.pilot.name,
-                        timestamp: Cesium.JulianDate.toIso8601(viewer.clock.currentTime, 0)
-                    }, coordinates));
 
-                /* Here we assume that if no file extension, it's a folder. Shrug */
-                } else if (files[i].name.indexOf(".") < 0) {
-                    // TODO: Perhaps use items[i].webkitGetAsEntry() or similar to determine folder
-                    console.log("Assuming dropped item is a folder", files[i]);
+    function dropOne(ev) {
+        assert(ev.dataTransfer && ev.dataTransfer.files);
+        assert(ev.dataTransfer.files.length == 1);
 
-                    /* The location has determines our subfolder, so set that and reload app */
-                    location.hash = files[i].name;
+        const file = ev.dataTransfer.files[0];
+        const item = ev.dataTransfer.items[0];
+        const kind = item.kind || "";
+        const url = URL.createObjectURL(file);
+        state.blobs[file.name] = url;
 
-                    /* Yes we ignore any other files */
-                    break;
+        const exts = assumeFileType(file.name, IMAGE_EXTS, IGC_EXTS, VIDEO_EXTS);
+        let promise = null;
+        if (exts == IGC_EXTS) {
+            promise = Flight.load(file.name);
 
-                } else {
-                    warning ("Couldn't load unsupported dropped item:", files[i].name);
-                }
+        } else if (exts || kind.startsWith("image/") || kind.startsWith("video/")) {
+            const coordinates = currentFlight ? null : pixelToLocation(ev.clientX, ev.clientY);
+            promise = Video.load(Object.assign({
+                filename: file.name,
+                pilot: state.pilot.name,
+                timestamp: Cesium.JulianDate.toIso8601(viewer.clock.currentTime, 0),
+                kind: kind,
+            }, coordinates));
 
-                if (promise) {
-                    promise.then(function(obj) {
-                        loaded(obj);
-                    }).catch(function(ex) {
-                        failure("Couldn't load file", files[i].name, ex)
-                    });
-                }
-            }
+        } else {
+            warning ("Couldn't load unsupported dropped item:", file.name);
         }
-        return highlightEvent(ev);
+
+        if (promise) {
+            promise.then(function(obj) {
+                loaded(obj);
+            }).catch(function(ex) {
+                failure("Couldn't load file", file.name, ex)
+            });
+        }
+    }
+
+    window.addEventListener("drop", function(ev) {
+        highlightEvent(ev);
+
+        if (!ev.dataTransfer || !ev.dataTransfer.files || !ev.dataTransfer.files.length)
+            warning("Drag and drop a flight, video or image to add");
+        else if (ev.dataTransfer.files.length == 1)
+            dropOne(ev);
+        else
+            warning("Don't drop multiple files at once");
+
+        return false;
     });
 
     /* Override the Ctrl-C to provide metadata.json */
     document.addEventListener('copy', function(ev) {
         ev.preventDefault();
-
-        const data = {
-            flights: [],
-            videos: [],
-            timezone: state.timeZone,
-            trailing: state.trailing,
-        };
-
-        Object.values(state.pilots).forEach(function(pilot) {
-            for(let i = 0; i < pilot.flights.length; i++) {
-                const item = pilot.flights.get(i).data.save();
-                data.flights.push(item);
-            }
-            for(let i = 0; i < pilot.videos.length; i++) {
-                const item = pilot.videos.get(i).data.save();
-                data.videos.push(item);
-            }
-        });
-
-        const json = JSON.stringify(data, null, 4);
-        ev.clipboardData.setData('text/plain', json);
+        ev.clipboardData.setData('text/plain', save());
     });
 
     /* The hash is our folder, we need to start fresh when it changes */
@@ -1248,6 +1262,36 @@ function initialize() {
 
     document.getElementById("pilot").addEventListener("click", function(ev) {
         Pilot.change(state.pilot.next);
+    });
+
+    document.getElementById("open-button").addEventListener("click", function(ev) {
+        document.getElementById("file-upload").click();
+    });
+
+    document.getElementById("save-button").addEventListener("click", function(ev) {
+        const config = new Blob([save()], { type: 'text/json;charset=utf-8' });
+        const url = URL.createObjectURL(config);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = "metadata.json";
+        anchor.click();
+        URL.revokeObjectURL(url);
+    });
+
+    document.getElementById("file-upload").addEventListener("change", function(ev) {
+        const files = ev.target.files;
+        let metadata = null;
+        for (let i = 0; i < files.length; i++) {
+            const url = URL.createObjectURL(files[i]);
+            state.blobs[files[i].name] = url;
+            if (files[i].name == "metadata.json")
+                metadata = files[i];
+        }
+
+        if (!metadata)
+            warning("The selected folder does not have a metadata.json");
+
+        load(null);
     });
 }
 

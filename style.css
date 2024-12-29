@@ -35,15 +35,35 @@ div.content img {
     height: 100%;
 }
 
-#pilot {
+#pilot,
+#open-button,
+#save-button {
     position: absolute;
     top: 5px;
-    right: 80px;
     height: 20px;
     font-family: sans-serif;
     font-weight: bold;
     font-size: 12pt;
     line-height: 16pt;
+    padding: 5px 7px;
+}
+
+#pilot {
+    right: 160px;
+}
+
+#open-button {
+    color: white;
+    right: 118px;
+}
+
+#save-button {
+    color: white;
+    right: 80px;
+}
+
+#file-upload {
+    display: none;
 }
 
 /* Stuff that displays above videos */
@@ -51,7 +71,7 @@ div.content img {
 .cesium-viewer-animationContainer,
 .cesium-viewer-timelineContainer,
 .cesium-viewer-fullscreenContainer,
-#pilot
+.cesium-button
 {
     z-index: 20;
 }
@@ -60,4 +80,8 @@ div.content img {
 .cesium-timeline-highlight {
     border-left: 2px solid white;
     border-right: 2px solid white;
+}
+
+.cesium-viewer-infoBoxContainer {
+    display: none !important;
 }
