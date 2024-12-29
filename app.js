@@ -844,8 +844,17 @@ function initialize() {
     });
 
     window.addEventListener("keydown", function(e) {
+
+        /* The Home key */
+        if (e.keyCode == 36) {
+            viewer.clock.currentTime = viewer.clock.startTime;
+
+        /* The End key */
+        } else if (e.keyCode == 35) {
+            viewer.clock.currentTime = viewer.clock.stopTime;
+
         /* PageUp and Page Down */
-        if (e.keyCode == 33 || e.keyCode == 34) {
+        } else if (e.keyCode == 33 || e.keyCode == 34) {
             if (e.keyCode == 33)
                 Pilot.change(state.pilot.prev);
             else
