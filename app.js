@@ -51,6 +51,10 @@ const state = {
     rate: DEFAULT_RATE,
 };
 
+/* For Javascript console debugging */
+window.viewer = viewer;
+window.state = state;
+
 /*
  * All colors available
  * https://htmlcolorcodes.com/color-chart/
