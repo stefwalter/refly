@@ -245,7 +245,9 @@ class Flight {
 
         const interval = new Cesium.TimeInterval({
             start: startTime,
-            stop: endTime
+            stop: endTime,
+            isStopIncluded: false,
+            data: this
         });
 
         /* Extend flight availability by default to 12 hours after landing */
@@ -301,7 +303,6 @@ class Flight {
         });
 
         /* Used for finding our flight based on the entity/interval */
-        interval.data = this;
         paraglider.data = this;
         tracker.data = this;
         entities.push(paraglider, tracker);
@@ -436,6 +437,8 @@ class Video {
             const interval = new Cesium.TimeInterval({
                 start: start,
                 stop: stop,
+                isStopIncluded: false,
+                data: that,
             });
 
             interval.data = that;
@@ -644,7 +647,7 @@ class Pilot {
         intervals.addInterval(obj.interval);
 
         /* This governs the whole timeline */
-        state.intervals.addInterval(obj.interval);
+        state.intervals.addInterval(obj.interval.clone());
 
         obj.pilot = this;
     }
@@ -731,6 +734,17 @@ async function load(folder) {
 
 function loaded(last) {
     let current = null;
+
+    /* Recreate the global intervals, videos overlay flights */
+    state.intervals = new Cesium.TimeIntervalCollection();
+    Object.values(state.pilots).forEach(function(pilot) {
+        for(let i = 0; i < pilot.flights.length; i++)
+            state.intervals.addInterval(pilot.flights.get(i));
+    });
+    Object.values(state.pilots).forEach(function(pilot) {
+        for(let i = 0; i < pilot.videos.length; i++)
+            state.intervals.addInterval(pilot.videos.get(i));
+    });
 
     /* Set up the timeline */
     if (state.intervals.length) {
@@ -854,82 +868,153 @@ function initialize() {
             else
                 Pilot.change(state.pilot.next);
 
-        /* Ctrl-Left or Ctrl-Right arrow keys */
-        } else if (e.ctrlKey && (e.keyCode == 37 || e.keyCode == 39)) {
+        /* Left or Right arrow keys (and optionally Ctrl modifier) */
+        } else if (e.keyCode == 37 || e.keyCode == 39) {
             if (!state.intervals.length)
                 return;
 
             const left = e.keyCode == 37;
+            const ctrl = e.ctrlKey;
             const current = viewer.clock.currentTime;
-            const extra = viewer.clock.multiplier > 0 ? -0.001 : 0.001;
-
             const jump = new Cesium.JulianDate(0, 0, Cesium.TimeStandard.UTC);
+            const seconds = JUMP_SECONDS * (left ? -1 : 1) * Math.abs(viewer.clock.multiplier);
+
             let index = state.intervals.indexOf(current);
             let interval = null;
 
-            /* Are we already at the start of an interval? */
+            function name() {
+                assert(interval);
+                return interval.data ? interval.data.name : index;
+            }
+
+            /* Do our boundary epsilon matching here */
             if (index >= 0) {
                 interval = state.intervals.get(index);
-                if (left && Cesium.JulianDate.equals(current, interval.start)) {
-                    index = ~index;
-                    console.log("treating start as no interval", index);
-                } 
-                else if (!left && Cesium.JulianDate.equals(current, interval.stop)) {
+                assert(interval);
+                if (left && Cesium.JulianDate.equalsEpsilon(current, interval.start, 1)) {
+                    console.log("Jump assuming before", name());
+                    index = ~index; /* This is how we indicate we're before this interval */
+                } else if (!left && Cesium.JulianDate.equalsEpsilon(current, interval.stop)) {
+                    console.log("Jumping assuming after", name());
                     index = ~(index + 1);
-                    console.log("treating stop as no interval", index);
+                }
+            }
+            if (index < 0) {
+                if (left) {
+                    interval = state.intervals.get((~index) - 1);
+                    if (interval && Cesium.JulianDate.equalsEpsilon(current, interval.stop, 1)) {
+                        console.log("Jump assuming within", name());
+                        index = (~index) - 1;
+                    }
+                } else {
+                    interval = state.intervals.get(~index);
+                    if (interval && Cesium.JulianDate.equalsEpsilon(current, interval.start, 1)) {
+                        console.log("Jump assuming within", name());
+                        index = ~index;
+                    }
                 }
             }
 
-            /* Are we in an interval? */
             if (index >= 0) {
                 interval = state.intervals.get(index);
-                console.log("jumping to", left ? "start" : "stop", interval, index, state.intervals.length);
-                if (interval) {
-                    Cesium.JulianDate.clone(left ? interval.start : interval.stop, jump);
-                    Cesium.JulianDate.addSeconds(jump, left ? extra : -extra, jump);
-                }
+                assert(interval);
 
-            /* Outside of a video jumping backwards */
-            } else if (left) {
-                interval = state.intervals.get(~index - 1);
-                console.log("jumping to prev", interval, ~index - 1, state.intervals.length);
-                if (interval) {
+                /* We're at the start of the first interval */
+                if (index == 0 && ctrl && left &&
+                    Cesium.JulianDate.equalsEpsilon(current, interval.start, 1)) {
+
+                    console.log("Jumping to beginning");
+                    Cesium.JulianDate.clone(viewer.clock.startTime, jump);
+
+                /* We're at the end of the very last interval */
+                } else if (index == state.intervals.length && ctrl && !left &&
+                    Cesium.JulianDate.equalsEpsilon(current, interval.stop)) {
+
+                    /* We're at the end of the very last interval */
+                    if (ctrl && index == state.intervals.length < 1) {
+                        console.log("Jumping to ending");
+                        Cesium.JulianDate.clone(viewer.clock.stopTime, jump);
+                    }
+
+                /* Jump to the start of the interval */
+                } else if (ctrl && left) {
+                    console.log("Jumping to start", name());
                     Cesium.JulianDate.clone(interval.start, jump);
-                    Cesium.JulianDate.addSeconds(jump, -extra, jump);
-                }
 
-            /* Outside of a video jumping forwards */
-            } else {
-                interval = state.intervals.get(~index);
-                console.log("jumping to next", interval, ~index, state.intervals.length);
-                if (interval) {
+                /* Jump to the stop of the interval */
+                } else if (ctrl && !left) {
+                    console.log("Jumping to stop", name());
                     Cesium.JulianDate.clone(interval.stop, jump);
-                    Cesium.JulianDate.addSeconds(jump, extra, jump);
+
+                /* Plain Arrow key */
+                } else if (!ctrl) {
+                    Cesium.JulianDate.addSeconds(current, seconds, jump);
+
+                    /* Jumping out of this interval, fall through to code below */
+                    if (state.intervals.indexOf(jump) != index)
+                        jump.dayNumber = jump.secondsOfDay = 0;
+                    else
+                        console.log("Jumping", seconds, left ? "backwards in" : "forwards in", name());
                 }
             }
 
-            if (interval) {
-                viewer.clock.currentTime = jump;
-                viewer.clock.onTick.raiseEvent(viewer.clock);
+
+            if (!jump.dayNumber) {
+
+                /* Not in an interval. Ctrl jumps to the previous */
+                if (ctrl && left) {
+                    interval = state.intervals.get((~index) - 1);
+                    if (interval) {
+                        console.log("Jumping to prev stop", name());
+                        Cesium.JulianDate.clone(interval.stop, jump);
+                    } else {
+                        console.log("Jumping to beginning");
+                        Cesium.JulianDate.clone(viewer.clock.startTime, jump);
+                    }
+
+                /* Ctrl outside of a video jumping forwards */
+                } else if (ctrl && !left) {
+                    interval = state.intervals.get(~index);
+                    if (interval) {
+                        console.log("Jumping to next start", name());
+                        Cesium.JulianDate.clone(interval.start, jump);
+                    } else {
+                        console.log("Jumping to ending");
+                        Cesium.JulianDate.clone(viewer.clock.stopTime, jump);
+                    }
+
+                /* And the standard jump outside of an interval */
+                } else {
+                    Cesium.JulianDate.addSeconds(current, seconds, jump);
+                    console.log("Jumping", seconds, left ? "backwards" : "forwards");
+                }
             }
 
-        } else if (e.keyCode == 37 || e.keyCode == 39) {
-            const left = e.keyCode == 37;
-            const current = viewer.clock.currentTime;
-            const jump = new Cesium.JulianDate(0, 0, Cesium.TimeStandard.UTC);
+            if (!jump.dayNumber) {
+                /* Again, if we're still in an interval, then jump to edge */
+                if (index >= 0) {
+                    interval = state.intervals.get(index);
+                    console.log("Jumping to", left ? "start of" : "stop of", name());
+                    Cesium.JulianDate.clone(left ? interval.start : interval.stop, jump);
+                }
+            }
 
-            Cesium.JulianDate.addSeconds(current,
-                JUMP_SECONDS * (left ? -1 : 1) * Math.abs(viewer.clock.multiplier), jump);
 
+            /* By now we should have reached a decision on where to go */
+            assert(jump.dayNumber);
+
+            /* See if we need to expand */
             let expanded = false;
             if (left) {
                 if (Cesium.JulianDate.lessThan(jump, viewer.clock.startTime)) {
                     viewer.clock.startTime = jump.clone();
+                    console.log("Expanding beginning of timeline", jump.toString());
                     expanded = true;
                 }
             } else {
                 if (Cesium.JulianDate.greaterThan(jump, viewer.clock.stopTime)) {
                     viewer.clock.stopTime = jump.clone();
+                    console.log("Expanding end of timeline", jump.toString());
                     expanded = true;
                 }
             }
@@ -937,8 +1022,11 @@ function initialize() {
             if (expanded)
                 viewer.timeline.zoomTo(viewer.clock.startTime, viewer.clock.stopTime);
 
+            /* One shouldn't be able to expand with Ctrl */
+            assert(!expanded || !ctrl);
+
+            /* Actually do the jump here */
             viewer.clock.currentTime = jump;
-            viewer.clock.onTick.raiseEvent(viewer.clock);
         }
 
         viewer.clock.onTick.raiseEvent(viewer.clock);
