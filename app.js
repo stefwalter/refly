@@ -117,7 +117,7 @@ function parseTimeZone(timestamp) {
     if (!timestamp) /* No timezone set? Then current browser timezone */
         return -(new Date("1970-01-01T00:00:00").valueOf()) / 1000;
     if (typeof timestamp == 'number')
-        return timestamp * 60; // Minutes offset
+        return timestamp; // Seconds offset
     if (typeof timestamp == 'string') {
         const date = Cesium.JulianDate.fromIso8601("1970-01-01T00:00:00" + timestamp);
         return -Cesium.JulianDate.toDate(date).valueOf() / 1000;
