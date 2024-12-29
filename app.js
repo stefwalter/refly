@@ -274,18 +274,6 @@ class Flight {
             })
         });
 
-        /*
-            // Create an entity to both visualize the sample series with a line and create a tracker
-    viewer.entities.add({
-        availability: new Cesium.TimeIntervalCollection([ new Cesium.TimeInterval({
-            start: startTime,
-            stop: endTime
-        }) ]),
-        position: trackerPositions,
-        point: { pixelSize: 30, color: Cesium.Color.GREEN },
-        path: new Cesium.PathGraphics( { width: 3 })
-    });
-    */
         const tracker = viewer.entities.add({
             availability: new Cesium.TimeIntervalCollection([ new Cesium.TimeInterval({
                 start: startTime,
