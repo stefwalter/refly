@@ -712,11 +712,6 @@ async function load(folder) {
     for (let i = 0; i < videos.length; i++)
         await Video.load(videos[i]);
 
-    /* Switch to the first named pilot */
-    const name = Object.keys(state.pilots).filter((n) => n).at(0);
-    if (name)
-        Pilot.change(state.pilots[name]);
-
     loaded(null);
 }
 
@@ -779,7 +774,7 @@ function initialize() {
     let trackedCamera = Cesium.Cartesian3.clone(DEFAULT_VIEW);
 
     /* We initially have a any pilot */
-    state.pilot = state.any = Pilot.ensure("");
+    Pilot.change(state.any = Pilot.ensure(""));
 
     /* Change the tracked flight */
     function changeFlight(flight) {
@@ -1102,16 +1097,29 @@ function initialize() {
             Cesium.Cartesian3.clone(viewer.camera.position, trackedCamera);
         }
 
-        /* The flight and video we should be on */
-        const fint = pilot.flights.findIntervalContainingDate(clock.currentTime);
-        const flight = fint ? fint.data : null;
-        let vint = pilot.videos.findIntervalContainingDate(clock.currentTime);
-        let video = vint ? vint.data : null;
+        const current = clock.currentTime;
+        let video = null;
+        let flight = null;
 
-        /* Look for videos on the any pilot */
-        if (!video && pilot != any) {
-            vint = any.videos.findIntervalContainingDate(clock.currentTime);
+        /* If it's the any pilot then look for all videos */
+        if (pilot == any) {
+            const aint = state.intervals.findIntervalContainingDate(current);
+            video = aint ? aint.data : null;
+            if (!(video instanceof Video))
+                video = null;
+
+        /* Specific pilot, look for flight or video */
+        } else {
+            const fint = pilot.flights.findIntervalContainingDate(current);
+            flight = fint ? fint.data : null;
+            const vint = pilot.videos.findIntervalContainingDate(current);
             video = vint ? vint.data : null;
+
+            /* Look for videos on the any pilot regardless of  */
+            if (!video && pilot != any) {
+                const xint = any.videos.findIntervalContainingDate(current);
+                video = xint ? xint.data : null;
+            }
         }
 
         /* Do we need to change the flight, or clear it? */
