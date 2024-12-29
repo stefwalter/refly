@@ -104,11 +104,14 @@ function parseJulianDate(timestamp) {
     assert(timestamp);
     if (typeof timestamp == 'number')
         timestamp = new Date(Math.max(0, timestamp));
-    if (typeof timestamp == 'object')
-        return Cesium.JulianDate.fromDate(timestamp);
-    if (typeof timestamp == 'string')
-        return Cesium.JulianDate.fromIso8601(timestamp);
-    assert(typeof timestamp == "invalid");
+    try {
+        if (typeof timestamp == 'object')
+            return Cesium.JulianDate.fromDate(timestamp);
+        if (typeof timestamp == 'string')
+            return Cesium.JulianDate.fromIso8601(timestamp);
+    } catch(ex) { }
+    warning("Couldn't parse timestamp in metadata:", timestamp);
+    return undefined;
 }
 
 /* Returns the timezone offset in Seconds */
