@@ -63,7 +63,7 @@ window.state = state;
  * https://htmlcolorcodes.com/color-chart/
  */
 const colors = [
-    "#000000", "#F1C40F", "#E67E22", "#2ecc71", "#27AE60", "#16A085", "#1ABC9C",
+    "#3498db", "#F1C40F", "#E67E22", "#2ecc71", "#27AE60", "#16A085", "#1ABC9C",
     "#3498DB", "#8E44AD", "#9B59B6", "#E74C3C", "#C0392B", "#F39C12", "#D35400",
 ];
 
@@ -569,7 +569,7 @@ class Pilot {
 
         /* Each pilot gets a color, and keep them unique based on pilot string*/
         this.color = new Cesium.Color(0, 0, 0);
-        Cesium.Color.fromCssColorString(colors.pop(), this.color);
+        Cesium.Color.fromCssColorString(colors.shift(), this.color);
 
         assert(!state.pilots[this.name]);
 
