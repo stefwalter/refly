@@ -987,8 +987,7 @@ function initialize() {
     });
 
     /* Here we store the base playback rate (ie: clock multiplier) */
-    let defaultRate = DEFAULT_RATE;
-    viewer.clock.multiplier = defaultRate;
+    viewer.clock.multiplier = DEFAULT_RATE;
 
     viewer.clock.onTick.addEventListener(function(clock) {
         const pilot = state.pilot;
