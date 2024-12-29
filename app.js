@@ -13,7 +13,7 @@ const JUMP_SECONDS = 10;
 const DEFAULT_VIEW = new Cesium.Cartesian3(50, -500, 1000);
 
 /* The graphic for the play button */
-const PLAY_BUTTON = 'data:image/svg+xml;utf8,<svg width="32" height="32" version="1.1" viewBox="0 0 2.4 2.4" xml:space="preserve" xmlns="http://www.w3.org/2000/svg"><path d="m1.2 0c-0.66168 0-1.2 0.53832-1.2 1.2s0.53832 1.2 1.2 1.2 1.2-0.53832 1.2-1.2-0.53832-1.2-1.2-1.2z" stroke-width="0" fill="black"/><path d="m1.8225 1.167-0.88-0.6c-0.01228-0.00832-0.02812-0.00924-0.04124-0.00232-0.01308 0.00692-0.02128 0.02052-0.02128 0.03536v1.2c0 0.01484 0.0082 0.02844 0.02132 0.03536 0.00584 0.00312 0.01228 0.00464 0.01868 0.00464 0.00788 0 0.01576-0.00236 0.02252-0.00696l0.88-0.6c0.01092-0.00744 0.01748-0.0198 0.01748-0.03304s-0.00656-0.0256-0.01748-0.03304z" fill="white" stroke-width="0"/></svg>';
+const PLAY_BUTTON = 'data:image/svg+xml;utf8,<svg width="32" height="32" version="1.1" viewBox="0 0 2.4 2.4" xml:space="preserve" xmlns="http://www.w3.org/2000/svg"><path d="m1.2 0c-0.66168 0-1.2 0.53832-1.2 1.2s0.53832 1.2 1.2 1.2 1.2-0.53832 1.2-1.2-0.53832-1.2-1.2-1.2zm-0.42618 0.56016c0.00923 4.05e-4 0.018423 0.002725 0.026367 0.006885l1.1047 0.6c0.014127 0.00744 0.022559 0.019719 0.022559 0.032959s-0.00843 0.025666-0.022559 0.033106l-1.1047 0.6c-0.00875 0.0046-0.018954 0.00688-0.02915 0.00688-0.00828 0-0.01661-0.00142-0.02417-0.00454-0.016976-0.0069168-0.027539-0.020606-0.027539-0.035446v-1.2c0-0.01484 0.010615-0.028383 0.027539-0.035303 0.00849-0.00346 0.017721-0.004946 0.026953-0.004541z" stroke-width="0" fill="black"/></svg>';
 
 /* Image extensions */
 const IMAGE_EXTS = [ '.jpg', '.jpeg', '.png' ];
@@ -444,11 +444,7 @@ class Video {
             const datauri = PLAY_BUTTON.replace("black", pilot.color.toCssHexString()).replace('#', '%23');
             const billboard = viewer.entities.add({
                 position: position,
-                billboard: {
-                    image: datauri,
-                    width: 32,
-                    height: 32
-                },
+                billboard: { image: datauri, width: 32, height: 32 },
             });
 
             billboard.data = that;
