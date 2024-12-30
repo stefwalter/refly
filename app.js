@@ -1387,6 +1387,8 @@ function initialize() {
                 metadata = files[i];
         }
 
+        if (files.length == 0)
+            return;
         if (!metadata)
             warning("The selected folder does not have a timeline.json");
 
