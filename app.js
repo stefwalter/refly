@@ -43,8 +43,8 @@ const state = {
     /* The entire set of intervals for the timeline */
     intervals: new Cesium.TimeIntervalCollection(),
 
-    /* Timezone offset in seconds from UTC */
-    timeZone: 0,
+    /* Timezone from the timeline.json */
+    timezone: 0,
 
     /* Trailing time for drawing flights */
     trailing: null,
@@ -108,7 +108,6 @@ function message(/* ... */) {
 }
 
 function parseJulianDate(timestamp) {
-    assert(timestamp);
     if (typeof timestamp == 'number')
         timestamp = new Date(Math.max(0, timestamp));
     try {
@@ -122,16 +121,19 @@ function parseJulianDate(timestamp) {
 }
 
 /* Returns the timezone offset in Seconds */
-function parseTimeZone(timestamp) {
-    if (!timestamp) /* No timezone set? Then current browser timezone */
-        return -(new Date("1970-01-01T00:00:00").valueOf()) / 1000;
+function parseTimezone(timestamp) {
     if (typeof timestamp == 'number')
         return timestamp; // Seconds offset
-    if (typeof timestamp == 'string') {
-        const date = Cesium.JulianDate.fromIso8601("1970-01-01T00:00:00" + timestamp);
-        return -Cesium.JulianDate.toDate(date).valueOf() / 1000;
-    }
-    assert(typeof timestamp == "invalid");
+    if (!timestamp)
+        return undefined;
+    try {
+        if (typeof timestamp == 'string') {
+            const date = Cesium.JulianDate.fromIso8601("1970-01-01T00:00:00" + timestamp);
+            return -Cesium.JulianDate.toDate(date).valueOf() / 1000;
+        }
+    } catch(ex) { }
+    warning("Couldn't parse timezone in timeline:", timestamp);
+    return undefined;
 }
 
 /* Returns the duration in seconds */
@@ -192,6 +194,7 @@ class Flight {
         this.igcData = igcData;
         this.name = filename;
 
+        this.timezone = null;
         this.paraglider = null;
         this.tracker = null;
         this.entities = null;
@@ -209,6 +212,10 @@ class Flight {
         let endTime = null;
 
         const pilot = Pilot.ensure(igcData.pilot);
+
+        /* IGC files have timezone in floating point hours, we need it in seconds */
+        if (typeof igcData.timezone == "number")
+            this.timezone = igcData.timezone * 3600;
 
         // The SampledPositionedProperty stores the position/timestamp for each sample along the series.
         const paragliderPositions = new Cesium.SampledPositionProperty();
@@ -381,11 +388,16 @@ Flight.load = async function loadFlight(filename) {
                 warning("Couldn't load flight log file file", filename, response.status, response.statusText);
         }
     } catch (ex) {
-        warning("Failure to parse IGC flight log file", filename, ":", error);
+        warning("Failure to parse IGC flight log file", filename, ":", ex);
     }
 
     var flight = new Flight(igcData, filename);
     await flight.create();
+
+    /* Use the first valid timezone in a flight */
+    if (typeof state.timezone != "number")
+        state.timezone = flight.timezone;
+
     return flight;
 }
 
@@ -744,8 +756,8 @@ async function load(folder) {
         warning("Couldn't load timeline.json", ex);
     }
 
-    /* Number of seconds to offset the timestamps */
-    state.timeZone = parseTimeZone(metadata.timezone);
+    /* Number of seconds to offset the timestamps, or null */
+    state.timezone = parseTimezone(metadata.timezone);
 
     /* Number of seconds to show flight trail behind active spot */
     state.trailing = parseDuration(metadata.trailing);
@@ -1118,22 +1130,24 @@ function initialize() {
         }
     }, true);
 
+    function formatIso8601(date) {
+        const offset = typeof state.timezone == "number" ? state.timezone :
+            -(new Date("1970-01-01T00:00:00").valueOf()) / 1000;
+        const display = new Cesium.JulianDate();
+        Cesium.JulianDate.addSeconds(date, offset, display);
+        return Cesium.JulianDate.toIso8601(display, 0);
+    }
+
     viewer.animation.viewModel.dateFormatter = function(date, viewModel) {
-        const offset = new Cesium.JulianDate();
-        Cesium.JulianDate.addSeconds(date, state.displayTimeZone, offset);
-        return Cesium.JulianDate.toIso8601(offset, 0).slice(0, 10);
+        return formatIso8601(date).slice(0, 10);
     };
 
     viewer.animation.viewModel.timeFormatter = function(date, viewModel) {
-        const offset = new Cesium.JulianDate();
-        Cesium.JulianDate.addSeconds(date, state.timeZone, offset);
-        return Cesium.JulianDate.toIso8601(offset, 0).slice(11, 19);
+        return formatIso8601(date).slice(11, 19);
     };
 
     viewer.timeline.makeLabel = function(date) {
-        const offset = new Cesium.JulianDate();
-        Cesium.JulianDate.addSeconds(date, state.timeZone, offset);
-        return Cesium.JulianDate.toIso8601(offset, 0).slice(11, 16);
+        return formatIso8601(date).slice(11, 16);
     };
 
     viewer.selectedEntityChanged.addEventListener(function(entity) {

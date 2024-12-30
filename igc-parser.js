@@ -20,6 +20,7 @@ var RE_SIT_HEADER = /^H(\w)SIT(?:.{0,}?:(.*)|(.*))$/;
 var RE_FTY_HEADER = /^H(\w)FTY(?:.{0,}?:(.*)|(.*))$/;
 var RE_RFW_HEADER = /^H(\w)RFW(?:.{0,}?:(.*)|(.*))$/;
 var RE_RHW_HEADER = /^H(\w)RHW(?:.{0,}?:(.*)|(.*))$/;
+var RE_TZN_HEADER = /^H(\w)TZN(?:.{0,}?:([-+]?[\d.]+))$/;
 var RE_B = /^B(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{3})([NS])(\d{3})(\d{2})(\d{3})([EW])([AV])(-\d{4}|\d{5})(-\d{4}|\d{5})/;
 var RE_K = /^K(\d{2})(\d{2})(\d{2})/;
 var RE_IJ = /^[IJ](\d{2})(?:\d{2}\d{2}[A-Z]{3})+/;
@@ -155,6 +156,9 @@ var IGCParser = /** @class */ (function () {
         else if (headerType === 'SIT') {
             this._result.site = this.parseSite(line);
         }
+        else if (headerType === 'TZN') {
+            this._result.timezone = this.parseTimezone(line);
+        }
         else if (headerType === 'FTY') {
             this._result.loggerType = this.parseLoggerType(line);
         }
@@ -224,6 +228,13 @@ var IGCParser = /** @class */ (function () {
     };
     IGCParser.prototype.parseSite = function (line) {
         return this.parseTextHeader('SIT', RE_SIT_HEADER, line);
+    };
+    IGCParser.prototype.parseTimezone = function (line) {
+        const result = this.parseTextHeader('TZN', RE_TZN_HEADER, line);
+        const hours = Number(result);
+        if (isNaN(hours))
+            throw new Error("Invalid " + headerType + " header at line " + this.lineNumber + ": " + line);
+        return hours;
     };
     IGCParser.prototype.parseLoggerType = function (line) {
         return this.parseTextHeader('FTY', RE_FTY_HEADER, line);
