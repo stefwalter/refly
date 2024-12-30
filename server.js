@@ -11,7 +11,7 @@ const IGCParser = require('igc-parser');
 const app = express();
 
 if (process.argv.length < 3) {
-    console.error("Specify directory with metadata.json as a command line argument");
+    console.error("Specify directory with timeline.json as a command line argument");
     process.exit(2);
 }
 

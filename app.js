@@ -117,7 +117,7 @@ function parseJulianDate(timestamp) {
         if (typeof timestamp == 'string')
             return Cesium.JulianDate.fromIso8601(timestamp);
     } catch(ex) { }
-    warning("Couldn't parse timestamp in metadata:", timestamp);
+    warning("Couldn't parse timestamp in timeline:", timestamp);
     return undefined;
 }
 
@@ -149,7 +149,7 @@ function parseDuration(timestamp) {
             ex = e;
         }
     }
-    warning("Couldn't parse duration in metadata:", timestamp, ex);
+    warning("Couldn't parse duration in timeline:", timestamp, ex);
     return undefined;
 }
 
@@ -731,17 +731,17 @@ async function load(folder) {
     state.folder = folder;
 
     try {
-        const response = await fetch(qualifiedUrl("metadata.json"));
+        const response = await fetch(qualifiedUrl("timeline.json"));
         if (response.ok) {
             metadata = await response.json();
         } else {
             if (response.status == 404)
-                message("No metadata.json, starting with a blank screen");
+                message("No timeline.json, starting with a blank screen");
             else
-                warning("Couldn't load metadata.json file", response.status, response.statusText);
+                warning("Couldn't load timeline.json file", response.status, response.statusText);
         }
     } catch (ex) {
-        warning("Couldn't load metadata.json", ex);
+        warning("Couldn't load timeline.json", ex);
     }
 
     /* Number of seconds to offset the timestamps */
@@ -1328,7 +1328,7 @@ function initialize() {
             viewer.canvas.style.cursor = 'default';
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-    /* Override the Ctrl-C to provide metadata.json */
+    /* Override the Ctrl-C to provide timeline.json */
     document.addEventListener('copy', function(ev) {
         ev.preventDefault();
         ev.clipboardData.setData('text/plain', save());
@@ -1357,7 +1357,7 @@ function initialize() {
         const url = URL.createObjectURL(config);
         const anchor = document.createElement('a');
         anchor.href = url;
-        anchor.download = "metadata.json";
+        anchor.download = "timeline.json";
         anchor.click();
         URL.revokeObjectURL(url);
     });
@@ -1368,12 +1368,12 @@ function initialize() {
         for (let i = 0; i < files.length; i++) {
             const url = URL.createObjectURL(files[i]);
             state.blobs[files[i].name] = url;
-            if (files[i].name == "metadata.json")
+            if (files[i].name == "timeline.json")
                 metadata = files[i];
         }
 
         if (!metadata)
-            warning("The selected folder does not have a metadata.json");
+            warning("The selected folder does not have a timeline.json");
 
         load(null);
     });
