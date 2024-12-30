@@ -1124,7 +1124,8 @@ function initialize() {
         }
 
         /* And jump to the entity */
-        if (!Cesium.TimeInterval.contains(interval, viewer.clock.currentTime)) {
+        if (obj instanceof Video ||
+            !Cesium.TimeInterval.contains(interval, viewer.clock.currentTime)) {
             viewer.clock.currentTime = interval.start;
             change = true;
         }
@@ -1286,6 +1287,16 @@ function initialize() {
 
         return false;
     });
+
+    /* On clickable things make us a nice mouse pointer */
+    const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    handler.setInputAction(function(movement) {
+        var pickedObject = viewer.scene.pick(movement.endPosition);
+        if (Cesium.defined(pickedObject))
+            viewer.canvas.style.cursor = 'pointer';
+        else
+            viewer.canvas.style.cursor = 'default';
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
     /* Override the Ctrl-C to provide metadata.json */
     document.addEventListener('copy', function(ev) {
