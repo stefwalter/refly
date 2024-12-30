@@ -1246,8 +1246,15 @@ function initialize() {
             return true;
         }
 
-        const ray = viewer.camera.getPickRay(new Cesium.Cartesian2(ev.clientX, ev.clientY));
-        const position = viewer.scene.globe.pick(ray, viewer.scene);
+        let position = null;
+
+        if (currentFlight) {
+            position = currentFlight.paraglider.position.getValue(viewer.clock.currentTime);
+        } else {
+            const ray = viewer.camera.getPickRay(new Cesium.Cartesian2(ev.clientX, ev.clientY));
+            position = viewer.scene.globe.pick(ray, viewer.scene);
+        }
+
         const transfer = ev.dataTransfer;
         const item = ev.dataTransfer.items[0] || { };
 
