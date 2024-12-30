@@ -1381,6 +1381,14 @@ function initialize() {
     viewer.scene.globe.tileLoadProgressEvent.addEventListener(function(ev) {
         spinner("tiles", !currentVideo && ev > 0, 5000);
     });
+
+    /* Add the help button instructions */
+    (function() {
+        const element = document.querySelector(".cesium-navigation-help TABLE");
+        const extra = document.getElementById("extra-help");
+        while (extra.childNodes.length)
+            element.appendChild(extra.childNodes[0]);
+    }());
 }
 
 initialize();

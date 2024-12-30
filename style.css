@@ -86,6 +86,16 @@ div.content img {
     display: none !important;
 }
 
+/* Extra help to include */
+#extra-help {
+    display: none;
+}
+
+.navigation-help-drop {
+    color: #E67E22;
+    font-weight: bold;
+}
+
 /* Loading spinner */
 #spinner {
   display: block;

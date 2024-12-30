@@ -13,11 +13,23 @@
 </head>
 <body>
   <div id="cesiumContainer">
-    <div id="pilot" class="cesium-button"></div>
-    <div id="open-button" class="cesium-button">&#x1f5c1;
+    <div id="pilot" class="cesium-button" title="Change tracking pilot"></div>
+    <div id="open-button" class="cesium-button" title="Open timeline folder">&#x1f5c1;
         <input id="file-upload" type="file" webkitdirectory="true">
     </div>
-    <div id="save-button" class="cesium-button">&#x1F847;</div>
+    <div id="save-button" class="cesium-button" title="Save timeline.json">&#x1F847;</div>
+
+    <table id="extra-help">
+        <tr>
+            <td></td>
+            <td>
+                <div class="navigation-help-drop">Add flights or videos</div>
+                <div class="cesium-navigation-help-details">
+                    Drop a flight (.igc), video (.mp4), or image (.jpg) file into screen to view.
+                </div>
+            </td>
+        </tr>
+    </table>
   </div>
   <div id="spinner"><div class="lds-ring"><div></div><div></div><div></div><div></div></div></div>
   <script type="module" src="app.js"></script>
