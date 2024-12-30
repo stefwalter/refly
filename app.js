@@ -594,20 +594,19 @@ class Video {
     }
 
     start() {
-        const videoData = this.videoData;
         const element = this.element;
         const interval = this.interval;
         const clock = viewer.clock;
-        const rate = this.rate;
         const name = this.name;
+        const that = this;
 
         function syncVideo() {
 
             /* Changing the rate during video play changes the metadata of the rate */
             // TODO: We should be updating all the intervals for this video. Hard
-            videoData.rate = Math.abs(clock.multiplier);
+            that.rate = that.videoData.rate = Math.abs(clock.multiplier);
 
-            const at = Cesium.JulianDate.secondsDifference(clock.currentTime, interval.start) / rate;
+            const at = Cesium.JulianDate.secondsDifference(clock.currentTime, interval.start) / that.rate;
             if (!Cesium.Math.equalsEpsilon(at, element.currentTime, Cesium.Math.EPSILON1, 1)) {
                 console.log("Syncing", name, element.currentTime, "->", at);
                 element.currentTime = at;
@@ -625,7 +624,7 @@ class Video {
 
         const direction = viewer.clock.multiplier < 0 ? -1 : 1;
         this.originalRate = viewer.clock.multiplier;
-        viewer.clock.multiplier = rate * direction;
+        viewer.clock.multiplier = this.rate * direction;
 
         /* If this is a <video>, do a synchronizer */
         if (this.element.play) {
