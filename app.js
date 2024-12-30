@@ -169,6 +169,24 @@ function assumeFileType(filename /* ... */) {
     return null;
 }
 
+const spinners = new Object();
+function spinner(identifier, waiting, timeout) {
+    function visibility() {
+        document.getElementById("spinner").style.display = Object.keys(spinners).length > 0 ? "block" : "none";
+    }
+    if (waiting && !(identifier in spinners)) {
+        spinners[identifier] = window.setTimeout(function() {
+            visibility();
+            if (identifier in spinners)
+                spinners[identifier] = null;
+        }, timeout || 100);
+    } else if (!waiting && identifier in spinners) {
+        window.clearTimeout(spinners[identifier]);
+        delete spinners[identifier];
+        visibility();
+    }
+}
+
 class Flight {
     constructor(igcData, filename) {
         this.igcData = igcData;
@@ -409,11 +427,20 @@ class Video {
         source.setAttribute('src', qualifiedUrl(videoData.filename));
         element.appendChild(source);
 
+        /* Identifier for spinners */
+        const identifier = videoData.filename + crypto.randomUUID;
+
         /* Special code for the video */
         if (element.pause) {
             element.setAttribute("loop", "false");
             element.setAttribute("preload", "metadata");
+
+            element.addEventListener("playing", function(e) {
+                spinner(identifier, false, 500);
+                console.log("Playing", videoData.filename);
+            });
             element.addEventListener("waiting", function(e) {
+                spinner(identifier, true, 500);
                 console.log("Waiting", videoData.filename);
             });
 
@@ -429,6 +456,8 @@ class Video {
         const start = parseJulianDate(videoData.timestamp);
 
         function completeVideo(resolve, reject) {
+            spinner(identifier, false);
+
             const duration = parseDuration(videoData.duration) || DEFAULT_DURATION;
             const stop = start.clone();
             Cesium.JulianDate.addSeconds(start, duration * that.rate, stop);
@@ -497,6 +526,7 @@ class Video {
 
         that.element = element;
         that.element.data = that;
+        spinner(identifier, true);
 
         return new Promise((resolve, reject) => {
             if (isImage || videoData.duration) {
@@ -1346,6 +1376,10 @@ function initialize() {
             warning("The selected folder does not have a metadata.json");
 
         load(null);
+    });
+
+    viewer.scene.globe.tileLoadProgressEvent.addEventListener(function(ev) {
+        spinner("tiles", !currentVideo && ev > 0, 5000);
     });
 }
 
