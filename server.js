@@ -10,19 +10,16 @@ const IGCParser = require('igc-parser');
 
 const app = express();
 
-if (process.argv.length < 3) {
-    console.error("Specify directory with timeline.json as a command line argument");
-    process.exit(2);
-}
+const directory = process.argv.at(2);
+if (process.argv.length == 3) {
+    if (!fs.existsSync(directory)) {
+        console.error("Invalid or non existent directory:", directory);
+        process.exit(2);
+    }
 
-const directory = process.argv[2];
-if (!fs.existsSync(directory)) {
-    console.error("Invalid or non existent directory:", directory);
-    process.exit(2);
+    // http://expressjs.com/en/starter/static-files.html
+    app.use(express.static(directory));
 }
-
-// http://expressjs.com/en/starter/static-files.html
-app.use(express.static(process.argv[2]));
 
 // http://expressjs.com/en/starter/basic-routing.html
 app.get('/', function(request, response) {
