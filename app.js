@@ -1181,11 +1181,42 @@ function initialize() {
             changeVideo(video);
     });
 
-    function highlightEvent(ev) {
-        const over = (ev.type == "dragover" || ev.type == "dragenter");
-        document.body.classList.toggle("highlight", over);
+    var dragEntity = null;
+
+    function isImageOrVideo(name, kind) {
+        const exts = assumeFileType(name, IMAGE_EXTS, VIDEO_EXTS);
+        return !!exts || kind.startsWith("image/") || kind.startsWith("video/");
+    }
+
+    function dragEvent(ev) {
         ev.preventDefault();
         ev.stopPropagation();
+
+        const over = (ev.type == "dragover" || ev.type == "dragenter");
+        document.body.classList.toggle("highlight", over);
+
+        if (ev.type == "drop" || ev.type == "dragleave") {
+            viewer.entities.remove(dragEntity);
+            dragEntity = null;
+            return true;
+        }
+
+        const ray = viewer.camera.getPickRay(new Cesium.Cartesian2(ev.clientX, ev.clientY));
+        const position = viewer.scene.globe.pick(ray, viewer.scene);
+        const transfer = ev.dataTransfer;
+        const item = ev.dataTransfer.items[0] || { };
+
+        if (dragEntity) {
+            dragEntity.position = position;
+
+        } else if (isImageOrVideo( "", item.type || "")) {
+            const datauri = PLAY_BUTTON.replace("black", state.pilot.color.toCssHexString()).replace('#', '%23');
+            dragEntity = viewer.entities.add({
+                position: position,
+                billboard: { image: datauri, width: 32, height: 32 },
+            });
+        }
+
         return true;
     }
 
@@ -1202,9 +1233,10 @@ function initialize() {
         };
     }
 
-    window.addEventListener("dragover", highlightEvent);
-    window.addEventListener("dragenter", highlightEvent);
-    window.addEventListener("dragleave", highlightEvent);
+
+    window.addEventListener("dragenter", dragEvent);
+    window.addEventListener("dragover", dragEvent);
+    window.addEventListener("dragleave", dragEvent);
 
     function dropOne(ev) {
         assert(ev.dataTransfer && ev.dataTransfer.files);
@@ -1216,12 +1248,8 @@ function initialize() {
         const url = URL.createObjectURL(file);
         state.blobs[file.name] = url;
 
-        const exts = assumeFileType(file.name, IMAGE_EXTS, IGC_EXTS, VIDEO_EXTS);
         let promise = null;
-        if (exts == IGC_EXTS) {
-            promise = Flight.load(file.name);
-
-        } else if (exts || kind.startsWith("image/") || kind.startsWith("video/")) {
+        if (isImageOrVideo(file.name, kind)) {
             const coordinates = currentFlight ? null : pixelToLocation(ev.clientX, ev.clientY);
             promise = Video.load(Object.assign({
                 filename: file.name,
@@ -1229,6 +1257,9 @@ function initialize() {
                 timestamp: Cesium.JulianDate.toIso8601(viewer.clock.currentTime, 0),
                 kind: kind,
             }, coordinates));
+
+        } else if (assumeFileType(file.name, IGC_EXTS)) {
+            promise = Flight.load(file.name);
 
         } else {
             warning ("Couldn't load unsupported dropped item:", file.name);
@@ -1244,7 +1275,7 @@ function initialize() {
     }
 
     window.addEventListener("drop", function(ev) {
-        highlightEvent(ev);
+        dragEvent(ev);
 
         if (!ev.dataTransfer || !ev.dataTransfer.files || !ev.dataTransfer.files.length)
             warning("Drag and drop a flight, video or image to add");
