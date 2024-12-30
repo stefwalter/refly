@@ -950,9 +950,10 @@ function initialize() {
 
             const left = e.keyCode == 37;
             const ctrl = e.ctrlKey;
+            const shift = e.shiftKey;
             const current = viewer.clock.currentTime;
             const jump = new Cesium.JulianDate(0, 0, Cesium.TimeStandard.UTC);
-            const seconds = JUMP_SECONDS * (left ? -1 : 1) * Math.abs(viewer.clock.multiplier);
+            const seconds = JUMP_SECONDS * (left ? -1 : 1) * Math.abs(shift ? 1 : viewer.clock.multiplier);
 
             let index = state.intervals.indexOf(current);
             let interval = null;
