@@ -777,7 +777,7 @@ function save() {
     const data = {
         flights: [],
         videos: [],
-        timezone: state.timeZone,
+        timezone: state.timezone,
         trailing: state.trailing,
     };
 
