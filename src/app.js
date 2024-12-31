@@ -4,6 +4,10 @@
 import * as Cesium from "cesium";
 
 import IGCParser from "./igc-parser.js";
+import {
+    DisplayOptions,
+    DisplayOptionsButton,
+} from "./displayoptions.js";
 import { problem, assert, failure, warning, message } from './util.js';
 import { parseTimestamp, parseTimezone, parseDuration } from './util.js';
 import { guessMimeType } from './util.js';
@@ -47,28 +51,33 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
     baseLayerPicker: false,
 });
 
-const state = {
-    pilots: { },
+class State extends DisplayOptions {
+    constructor() {
+        super();
+        this.pilots = { };
 
-    /* The entire set of intervals for the timeline */
-    intervals: new Cesium.TimeIntervalCollection(),
+        /* The entire set of intervals for the timeline */
+        this.intervals = new Cesium.TimeIntervalCollection();
 
-    /* Timezone from the timeline.json */
-    timezone: 0,
+        /* Timezone from the timeline.json */
+        this.timezone = 0;
 
-    /* Trailing time for drawing flights */
-    trailing: null,
+        /* Trailing time for drawing flights */
+        this.trailing = null;
 
-    /* Sub-folder currently being used */
-    folder: null,
+        /* Sub-folder currently being used */
+        this.folder = null;
 
-    /* Currently being displayed */
-    pilot: null,
-    any: null,
+        /* Currently being displayed */
+        this.pilot = null;
+        this.any = null;
 
-    /* Loaded from the client */
-    blobs: { },
+        /* Loaded from the client */
+        this.blobs = { };
+    }
 };
+
+const state = new State();
 
 /* For Javascript console debugging */
 window.viewer = viewer;
@@ -1117,13 +1126,17 @@ function initialize() {
         const current = clock.currentTime;
         let video = null;
         let flight = null;
+        let found = false;
 
         /* If it's the any pilot then look for all videos */
         if (pilot == any) {
             const aint = state.intervals.findIntervalContainingDate(current);
-            video = aint ? aint.data : null;
-            if (!(video instanceof Video))
-                video = null;
+            if (aint) {
+                video = aint.data instanceof Video ? aint.data : null;
+
+                /* Found anything, so this spot in timeline is relevant */
+                found = true;
+            }
 
         /* Specific pilot, look for flight or video */
         } else {
@@ -1137,6 +1150,9 @@ function initialize() {
                 const xint = any.videos.findIntervalContainingDate(current);
                 video = xint ? xint.data : null;
             }
+
+            /* Anything found means we're at a relevent place in the timeline */
+            found = !!flight || !!video;
         }
 
         /* Do we need to change the flight, or clear it? */
@@ -1146,6 +1162,11 @@ function initialize() {
         /* Do we need to change the video, or clear it? */
         if (video != currentVideo)
             changeVideo(video);
+
+        /* If in seamless mode, and no video/flight displayed then jump to next one */
+        if (!found && clock.shouldAnimate && state.seamless && state.intervals.length)
+            jumpTimeline(clock.multiplier > 0 ? true : false, true);
+
     });
 
     var dragEntity = null;
@@ -1330,6 +1351,10 @@ function initialize() {
         while (extra.childNodes.length)
             element.appendChild(extra.childNodes[0]);
     }());
+
+    // TODO: Need to call destroy() on this when we implement resetting screen
+    const element = document.getElementsByClassName("cesium-viewer-toolbar")[0];
+    new DisplayOptionsButton(element, { viewModel: state });
 
     /* Finally make the widget visible */
     viewer.container.style.display = 'block';
