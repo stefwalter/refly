@@ -182,6 +182,8 @@ test('parseDuration', function() {
 });
 
 test('guessMimeType', function() {
+    expect(util.guessMimeType('test.igc', "text/plain")).toBe("text/plain");
+    expect(util.guessMimeType('test.igc', null)).toBe("application/x-igc");
     expect(util.guessMimeType('test.igc')).toBe('application/x-igc');
     expect(util.guessMimeType('test.IGC')).toBe('application/x-igc');
     expect(util.guessMimeType('test.mp4')).toBe('video/mp4');
@@ -197,6 +199,6 @@ test('guessMimeType', function() {
     expect(util.guessMimeType('with-folder/test.PNG')).toBe('image/png');
     expect(util.guessMimeType('with-multiple-extensions.txt.PNG')).toBe('image/png');
     expect(util.guessMimeType('with spaces.png')).toBe('image/png');
-    expect(util.guessMimeType('test.txt')).toBe(null);
-    expect(util.guessMimeType('test')).toBe(null);
+    expect(util.guessMimeType('test.txt')).toBe("application/binary");
+    expect(util.guessMimeType('test')).toBe("application/binary");
 });
