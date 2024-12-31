@@ -403,4 +403,3 @@ var IGCParser = /** @class */ (function () {
 
 export default IGCParser;
 module.exports = IGCParser;
-//# sourceMappingURL=index.js.map
