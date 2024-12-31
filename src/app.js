@@ -1,7 +1,15 @@
 "use strict";
 
-/* global Cesium */
+// TODO: Eventually remove this and do individual imports
+import * as Cesium from "cesium";
+
 import IGCParser from "./igc-parser.js";
+import { problem, assert, failure, warning, message } from './util.js';
+import { parseTimestamp, parseTimezone, parseDuration } from './util.js';
+import { guessMimeType } from './util.js';
+
+import "cesium/Build/Cesium/Widgets/widgets.css";
+import "./style.css";
 
 /* Default playback rate of flights */
 const DEFAULT_RATE = 50;
@@ -17,15 +25,6 @@ const DEFAULT_VIEW = new Cesium.Cartesian3(50, -500, 1000);
 
 /* The graphic for the play button */
 const PLAY_BUTTON = 'data:image/svg+xml;utf8,<svg width="32" height="32" version="1.1" viewBox="0 0 2.4 2.4" xml:space="preserve" xmlns="http://www.w3.org/2000/svg"><path d="m1.2 0c-0.66168 0-1.2 0.53832-1.2 1.2s0.53832 1.2 1.2 1.2 1.2-0.53832 1.2-1.2-0.53832-1.2-1.2-1.2zm-0.42618 0.56016c0.00923 4.05e-4 0.018423 0.002725 0.026367 0.006885l1.1047 0.6c0.014127 0.00744 0.022559 0.019719 0.022559 0.032959s-0.00843 0.025666-0.022559 0.033106l-1.1047 0.6c-0.00875 0.0046-0.018954 0.00688-0.02915 0.00688-0.00828 0-0.01661-0.00142-0.02417-0.00454-0.016976-0.0069168-0.027539-0.020606-0.027539-0.035446v-1.2c0-0.01484 0.010615-0.028383 0.027539-0.035303 0.00849-0.00346 0.017721-0.004946 0.026953-0.004541z" stroke-width="0" fill="black"/></svg>';
-
-/* Image extensions */
-const IMAGE_EXTS = [ '.jpg', '.jpeg', '.png' ];
-
-/* IGC file extensions */
-const IGC_EXTS = [ '.igc' ];
-
-/* Video extensions */
-const VIDEO_EXTS = [ '.mp4', '.mov' ];
 
 /* Ticks for the playback rate dial */
 const DIAL_TICKS = [ 0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 15.0, 16.0,
@@ -75,104 +74,6 @@ const colors = [
     "#3498db", "#F1C40F", "#E67E22", "#2ecc71", "#27AE60", "#16A085", "#1ABC9C",
     "#3498DB", "#8E44AD", "#9B59B6", "#E74C3C", "#C0392B", "#F39C12", "#D35400",
 ];
-
-/* Helper to show an error via the Cesium error panel */
-function problem(title, args) {
-    const message = [ ];
-    let error = null;
-    for (let i = 0; i < args.length; i++) {
-        if (args[i] && args[i].stack)
-            error = args[i].stack;
-        else
-            message.push(String(args[i]));
-    }
-    viewer.cesiumWidget.showErrorPanel(title, message.join(" "), error);
-}
-
-function assert(/* ... */) {
-    console.assert.apply(console, arguments);
-
-    if (!arguments[0])
-        problem("Code problem", [ "See javascript console for details" ]);
-}
-
-function failure(/* ... */) {
-    console.error.apply(console, arguments);
-    problem("Failure", arguments);
-}
-
-function warning(/* ... */) {
-    console.warn.apply(console, arguments);
-    problem("Warning", arguments);
-}
-
-function message(/* ... */) {
-    console.info.apply(console, arguments);
-}
-
-function parseJulianDate(timestamp) {
-    if (typeof timestamp == 'number')
-        timestamp = new Date(Math.max(0, timestamp));
-    try {
-        if (typeof timestamp == 'object')
-            return Cesium.JulianDate.fromDate(timestamp);
-        if (typeof timestamp == 'string')
-            return Cesium.JulianDate.fromIso8601(timestamp);
-    } finally { ; }
-    warning("Couldn't parse timestamp in timeline:", timestamp);
-    return undefined;
-}
-
-/* Returns the timezone offset in Seconds */
-function parseTimezone(timestamp) {
-    if (typeof timestamp == 'number')
-        return timestamp; // Seconds offset
-    if (!timestamp)
-        return undefined;
-    try {
-        if (typeof timestamp == 'string') {
-            const date = Cesium.JulianDate.fromIso8601("1970-01-01T00:00:00" + timestamp);
-            return -Cesium.JulianDate.toDate(date).valueOf() / 1000;
-        }
-    } finally { ; }
-    warning("Couldn't parse timezone in timeline:", timestamp);
-    return undefined;
-}
-
-/* Returns the duration in seconds */
-function parseDuration(timestamp) {
-    if (typeof timestamp == 'number')
-        return timestamp; // Numbers are seconds
-    if (!timestamp)
-        return undefined;
-    let ex = null;
-    if (typeof timestamp == "string") {
-        try {
-            const date = Cesium.JulianDate.fromIso8601("1970-01-01T" + timestamp + "Z");
-            return Cesium.JulianDate.toDate(date).valueOf() / 1000;
-        } catch(e) {
-            ex = e;
-        }
-    }
-    warning("Couldn't parse duration in timeline:", timestamp, ex);
-    return undefined;
-}
-
-/*
- * Match the file name to various extension lists
- * provided as option alguments and return the
- * extension list that matches.
- */
-function assumeFileType(filename /* ... */) {
-    assert(typeof filename == "string");
-    const lcase = filename.toLowerCase();
-    for (let i = 1; i < arguments.length; i++) {
-        assert(arguments[i].reduce);
-        if (arguments[i].reduce((acc, ext) => acc + lcase.endsWith(ext), 0) > 0)
-            return arguments[i];
-    }
-    return null;
-}
 
 const spinners = new Object();
 function spinner(identifier, waiting, timeout) {
@@ -251,7 +152,7 @@ class Flight {
             const fix = igcData.fixes[i];
 
             // const altitude = (fix.gpsAltitude + fix.pressureAltitude) / 2;
-            const time = parseJulianDate(fix.timestamp);
+            const time = parseTimestamp(fix.timestamp);
             const altitude = fix.gpsAltitude - 70;
             const position = Cesium.Cartesian3.fromDegrees(fix.longitude, fix.latitude, altitude);
 
@@ -432,8 +333,7 @@ class Video {
                 that.rate = videoData.rate;
         }
 
-        const kind = videoData.kind || "";
-        const isImage = !!assumeFileType(videoData.filename, IMAGE_EXTS) || kind.startsWith("image/");
+        const isImage = guessMimeType(videoData.filename, videoData.kind).startsWith("image/");
         const element = document.createElement(isImage ? "div" : "video");
         element.setAttribute("class", "content");
         element.style.visibility = "hidden";
@@ -468,7 +368,7 @@ class Video {
         const pilot = Pilot.ensure(videoData.pilot);
 
         // TODO: Validate dates
-        const start = parseJulianDate(videoData.timestamp);
+        const start = parseTimestamp(videoData.timestamp);
 
         function completeVideo() {
             spinner(identifier, false);
@@ -858,6 +758,11 @@ function initialize() {
     /* Defined in config.js */
     Cesium.Ion.defaultAccessToken = window.defaultAccessToken;
 
+    /* Connects to util.problem */
+    problem.addEventListener(function(title, message, error) {
+        viewer.cesiumWidget.showErrorPanel(title, message, error);
+    });
+
     /* Our ticks are also good defaults for video rate */
     viewer.animation.viewModel.setShuttleRingTicks(DIAL_TICKS);
 
@@ -1234,11 +1139,6 @@ function initialize() {
 
     var dragEntity = null;
 
-    function isImageOrVideo(name, kind) {
-        const exts = assumeFileType(name, IMAGE_EXTS, VIDEO_EXTS);
-        return !!exts || kind.startsWith("image/") || kind.startsWith("video/");
-    }
-
     function dragEvent(ev) {
         ev.preventDefault();
         ev.stopPropagation();
@@ -1262,11 +1162,12 @@ function initialize() {
         }
 
         const item = ev.dataTransfer.items[0] || { };
+        const type = guessMimeType("", item.type);
 
         if (dragEntity) {
             dragEntity.position = position;
 
-        } else if (isImageOrVideo( "", item.type || "")) {
+        } else if (type.startsWith("image/") || type.startsWith("video/")) {
             const datauri = PLAY_BUTTON.replace("black", state.pilot.color.toCssHexString()).replace('#', '%23');
             dragEntity = viewer.entities.add({
                 position: position,
@@ -1306,7 +1207,8 @@ function initialize() {
         state.blobs[file.name] = url;
 
         let promise = null;
-        if (isImageOrVideo(file.name, kind)) {
+        const type = guessMimeType(file.name, kind);
+        if (type.startsWith("image/") || type.startsWith("video/")) {
             const coordinates = currentFlight ? null : pixelToLocation(ev.clientX, ev.clientY);
             promise = Video.load(Object.assign({
                 filename: file.name,
@@ -1315,7 +1217,7 @@ function initialize() {
                 kind: kind,
             }, coordinates));
 
-        } else if (assumeFileType(file.name, IGC_EXTS)) {
+        } else if (type == "application/x-igc") {
             promise = Flight.load(file.name);
 
         } else {

@@ -6,6 +6,7 @@ node_modules/
 *.swp
 /config.js
 /public/config.js
+/coverage
 *.igc
 *.iGC
 
