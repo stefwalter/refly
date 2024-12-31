@@ -760,7 +760,7 @@ function initialize() {
 
     /* Connects to util.problem */
     problem.addEventListener(function(title, message, error) {
-        viewer.cesiumWidget.showErrorPanel(title, message.join(" "), error);
+        viewer.cesiumWidget.showErrorPanel(title, message, error);
     });
 
     /* Our ticks are also good defaults for video rate */
