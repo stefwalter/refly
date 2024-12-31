@@ -855,6 +855,9 @@ function initialize() {
     const trackedPosition = new Cesium.Cartesian3(0, 0, 0);
     const trackedCamera = Cesium.Cartesian3.clone(DEFAULT_VIEW);
 
+    /* Defined in config.js */
+    Cesium.Ion.defaultAccessToken = window.defaultAccessToken;
+
     /* Our ticks are also good defaults for video rate */
     viewer.animation.viewModel.setShuttleRingTicks(DIAL_TICKS);
 

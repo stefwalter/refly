@@ -3,5 +3,5 @@
  * 
  * Get your token from https://cesium.com/ion/tokens
  */
-Cesium.Ion.defaultAccessToken = 'your_token_here';
+window.defaultAccessToken = 'your_token_here';
 
