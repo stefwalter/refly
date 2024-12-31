@@ -1,5 +1,8 @@
 "use strict";
 
+/* global Cesium */
+import IGCParser from "./igc-parser.js";
+
 /* Default playback rate of flights */
 const DEFAULT_RATE = 50;
 
@@ -115,7 +118,7 @@ function parseJulianDate(timestamp) {
             return Cesium.JulianDate.fromDate(timestamp);
         if (typeof timestamp == 'string')
             return Cesium.JulianDate.fromIso8601(timestamp);
-    } catch(ex) { }
+    } finally { ; }
     warning("Couldn't parse timestamp in timeline:", timestamp);
     return undefined;
 }
@@ -131,7 +134,7 @@ function parseTimezone(timestamp) {
             const date = Cesium.JulianDate.fromIso8601("1970-01-01T00:00:00" + timestamp);
             return -Cesium.JulianDate.toDate(date).valueOf() / 1000;
         }
-    } catch(ex) { }
+    } finally { ; }
     warning("Couldn't parse timezone in timeline:", timestamp);
     return undefined;
 }
@@ -353,7 +356,7 @@ class Flight {
         viewer.timeline.resize();
 
         while (this.entities && this.entities.length) {
-            let entity = this.entities.pop();
+            const entity = this.entities.pop();
             viewer.entities.remove(entity);
             entity.data = null;
         }
@@ -399,7 +402,7 @@ Flight.load = async function loadFlight(filename) {
         state.timezone = flight.timezone;
 
     return flight;
-}
+};
 
 class Video {
     constructor(videoData) {
@@ -447,16 +450,16 @@ class Video {
             element.setAttribute("loop", "false");
             element.setAttribute("preload", "metadata");
 
-            element.addEventListener("playing", function(e) {
+            element.addEventListener("playing", function() {
                 spinner(identifier, false, 500);
                 console.log("Playing", videoData.filename);
             });
-            element.addEventListener("waiting", function(e) {
+            element.addEventListener("waiting", function() {
                 spinner(identifier, true, 500);
                 console.log("Waiting", videoData.filename);
             });
 
-            element.addEventListener("seeking", function(e) {
+            element.addEventListener("seeking", function() {
                 console.log("Seeking", videoData.filename);
             });
         }
@@ -467,7 +470,7 @@ class Video {
         // TODO: Validate dates
         const start = parseJulianDate(videoData.timestamp);
 
-        function completeVideo(resolve, reject) {
+        function completeVideo() {
             spinner(identifier, false);
 
             const duration = parseDuration(videoData.duration) || DEFAULT_DURATION;
@@ -492,8 +495,6 @@ class Video {
             that.range = viewer.timeline.addHighlightRange(pilot.color.toCssHexString(),
                 3, pilot.index * 2 + 5);
             that.range.setRange(interval.start, interval.stop);
-
-            resolve();
         }
 
         that.entities = [ ];
@@ -542,21 +543,23 @@ class Video {
 
         return new Promise((resolve, reject) => {
             if (isImage || videoData.duration) {
-                completeVideo(resolve, reject);
+                completeVideo();
+                resolve();
                 return;
             }
 
-            const timeout = window.setTimeout(function(ev) {
+            const timeout = window.setTimeout(function() {
                 element.removeEventListener("loadedmetadata", listener);
                 window.clearTimeout(timeout);
                 reject(new Error("Timeout finding duration of video: " + that.name));
             }, 10000);
-            const listener = element.addEventListener("loadedmetadata", function(ev) {
+            const listener = element.addEventListener("loadedmetadata", function() {
                 element.removeEventListener("loadedmetadata", listener);
                 window.clearTimeout(timeout);
                 if (element.duration) {
                     videoData.duration = element.duration;
-                    completeVideo(resolve, reject);
+                    completeVideo();
+                    resolve();
                 } else {
                     reject(new Error("Unable to find duration of video: " + that.name));
                 }
@@ -572,7 +575,7 @@ class Video {
         this.element.data = null;
 
         while (this.entities && this.entities.length) {
-            let entity = this.entities.pop();
+            const entity = this.entities.pop();
             viewer.entities.remove(entity);
             entity.data = null;
         }
@@ -670,11 +673,11 @@ class Pilot {
 
         assert(!state.pilots[this.name]);
 
-        let first = Object.values(state.pilots).at(0);
+        const first = Object.values(state.pilots).at(0);
         state.pilots[this.name] = this;
 
         /* A linked list between all pilots */
-        first = this.next = first || this;
+        this.next = first || this;
         this.prev = this.next.prev || this;
         this.prev.next = this;
         this.next.prev = this;
@@ -723,11 +726,11 @@ Pilot.ensure = function ensurePilot(name) {
 Pilot.change = function changePilot(pilot) {
     // Assume that the onTick will change
     state.pilot = pilot;
-    const element = document.getElementById("pilot")
+    const element = document.getElementById("pilot");
     element.innerText = pilot.name || "Any pilot";
     element.style.color = pilot.color.toCssHexString();
     console.log("Pilot", pilot.name);
-}
+};
 
 function qualifiedUrl(path) {
     if (state.folder)
@@ -849,8 +852,8 @@ function loaded(last) {
 function initialize() {
     let currentFlight = null;
     let currentVideo = null;
-    let trackedPosition = new Cesium.Cartesian3(0, 0, 0);
-    let trackedCamera = Cesium.Cartesian3.clone(DEFAULT_VIEW);
+    const trackedPosition = new Cesium.Cartesian3(0, 0, 0);
+    const trackedCamera = Cesium.Cartesian3.clone(DEFAULT_VIEW);
 
     /* Our ticks are also good defaults for video rate */
     viewer.animation.viewModel.setShuttleRingTicks(DIAL_TICKS);
@@ -920,7 +923,7 @@ function initialize() {
         console.log("Video", old, "->", video ? video.name : null);
     }
 
-    window.addEventListener("mousemove", function(e) {
+    window.addEventListener("mousemove", function() {
         displayCesium();
         viewer.clock.onTick.raiseEvent(viewer.clock);
     });
@@ -1138,11 +1141,11 @@ function initialize() {
         return Cesium.JulianDate.toIso8601(display, 0);
     }
 
-    viewer.animation.viewModel.dateFormatter = function(date, viewModel) {
+    viewer.animation.viewModel.dateFormatter = function(date/*, viewModel */) {
         return formatIso8601(date).slice(0, 10);
     };
 
-    viewer.animation.viewModel.timeFormatter = function(date, viewModel) {
+    viewer.animation.viewModel.timeFormatter = function(date/*, viewModel */) {
         return formatIso8601(date).slice(11, 19);
     };
 
@@ -1255,7 +1258,6 @@ function initialize() {
             position = viewer.scene.globe.pick(ray, viewer.scene);
         }
 
-        const transfer = ev.dataTransfer;
         const item = ev.dataTransfer.items[0] || { };
 
         if (dragEntity) {
@@ -1321,7 +1323,7 @@ function initialize() {
             promise.then(function(obj) {
                 loaded(obj);
             }).catch(function(ex) {
-                failure("Couldn't load file", file.name, ex)
+                failure("Couldn't load file", file.name, ex);
             });
         }
     }
@@ -1356,7 +1358,7 @@ function initialize() {
     });
 
     /* The hash is our folder, we need to start fresh when it changes */
-    window.addEventListener("hashchange", function(ev) {
+    window.addEventListener("hashchange", function(/* ev */) {
         location.reload();
     });
 
@@ -1365,15 +1367,15 @@ function initialize() {
         viewer.flyTo(viewer.entities || []);
     });
 
-    document.getElementById("pilot").addEventListener("click", function(ev) {
+    document.getElementById("pilot").addEventListener("click", function(/* ev */) {
         Pilot.change(state.pilot.next);
     });
 
-    document.getElementById("open-button").addEventListener("click", function(ev) {
+    document.getElementById("open-button").addEventListener("click", function(/* ev */) {
         document.getElementById("file-upload").click();
     });
 
-    document.getElementById("save-button").addEventListener("click", function(ev) {
+    document.getElementById("save-button").addEventListener("click", function(/* ev */) {
         const config = new Blob([save()], { type: 'text/json;charset=utf-8' });
         const url = URL.createObjectURL(config);
         const anchor = document.createElement('a');
@@ -1417,4 +1419,4 @@ function initialize() {
 initialize();
 
 /* Load the folder described by the #bookmark in URI */
-load(location.hash ? location.hash.substr(1) : null)
+load(location.hash ? location.hash.substr(1) : null);

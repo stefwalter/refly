@@ -1,5 +1,6 @@
 "use strict";
 
+/* eslint semi:off, "no-redeclare":off, "no-useless-escape":off */
 /* Some stub outs */
 function require() { return function () { return "dummy" } }
 const module = { exports: window };
@@ -233,7 +234,7 @@ var IGCParser = /** @class */ (function () {
         const result = this.parseTextHeader('TZN', RE_TZN_HEADER, line);
         const hours = Number(result);
         if (isNaN(hours))
-            throw new Error("Invalid " + headerType + " header at line " + this.lineNumber + ": " + line);
+            throw new Error("Invalid TZN header at line " + this.lineNumber + ": " + line);
         return hours;
     };
     IGCParser.prototype.parseLoggerType = function (line) {
@@ -399,5 +400,7 @@ var IGCParser = /** @class */ (function () {
     };
     return IGCParser;
 }());
+
+export default IGCParser;
 module.exports = IGCParser;
 //# sourceMappingURL=index.js.map
