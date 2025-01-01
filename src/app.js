@@ -30,8 +30,16 @@ const PLAY_BUTTON = 'data:image/svg+xml;utf8,<svg width="32" height="32" version
 const DIAL_TICKS = [ 0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 15.0, 16.0,
   20.0, 25.0, 30.0, 40.0, 50.0, 75.0, 100.0, 200.0, 300.0, 500.0, 1000.0 ];
 
+/* Defined in config.js */
+Cesium.Ion.defaultAccessToken = window.defaultAccessToken;
+
+/* The baselayer */
+// const BING_MAPS = 2; // Bing maps
+const BASE_LAYER = 3954; // Sentinel-2
+
 const viewer = new Cesium.Viewer('cesiumContainer', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
+    baseLayer: Cesium.ImageryLayer.fromProviderAsync(Cesium.IonImageryProvider.fromAssetId(BASE_LAYER)),
     selectionIndicator: false,
     geocoder: false,
     scene3DOnly: true,
@@ -754,9 +762,6 @@ function initialize() {
     let currentVideo = null;
     const trackedPosition = new Cesium.Cartesian3(0, 0, 0);
     const trackedCamera = Cesium.Cartesian3.clone(DEFAULT_VIEW);
-
-    /* Defined in config.js */
-    Cesium.Ion.defaultAccessToken = window.defaultAccessToken;
 
     /* Connects to util.problem */
     problem.addEventListener(function(title, message, error) {
