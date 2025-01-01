@@ -1324,6 +1324,9 @@ function initialize() {
         while (extra.childNodes.length)
             element.appendChild(extra.childNodes[0]);
     }());
+
+    /* Finally make the widget visible */
+    viewer.container.style.display = 'block';
 }
 
 initialize();
