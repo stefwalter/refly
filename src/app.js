@@ -26,7 +26,7 @@ const DEFAULT_DURATION = 5;
 const JUMP_SECONDS = 10;
 
 /* Default camera offset to track from */
-const DEFAULT_VIEW = new Cesium.Cartesian3(50, -500, 1000);
+const DEFAULT_VIEW = new Cesium.Cartesian3(50, -500, 2000);
 
 /* The graphic for the play button */
 const PLAY_BUTTON = 'data:image/svg+xml;utf8,<svg width="32" height="32" version="1.1" viewBox="0 0 2.4 2.4" xml:space="preserve" xmlns="http://www.w3.org/2000/svg"><path d="m1.2 0c-0.66168 0-1.2 0.53832-1.2 1.2s0.53832 1.2 1.2 1.2 1.2-0.53832 1.2-1.2-0.53832-1.2-1.2-1.2zm-0.42618 0.56016c0.00923 4.05e-4 0.018423 0.002725 0.026367 0.006885l1.1047 0.6c0.014127 0.00744 0.022559 0.019719 0.022559 0.032959s-0.00843 0.025666-0.022559 0.033106l-1.1047 0.6c-0.00875 0.0046-0.018954 0.00688-0.02915 0.00688-0.00828 0-0.01661-0.00142-0.02417-0.00454-0.016976-0.0069168-0.027539-0.020606-0.027539-0.035446v-1.2c0-0.01484 0.010615-0.028383 0.027539-0.035303 0.00849-0.00346 0.017721-0.004946 0.026953-0.004541z" stroke-width="0" fill="black"/></svg>';
@@ -764,7 +764,6 @@ function loaded(last) {
 function initialize() {
     let currentFlight = null;
     let currentVideo = null;
-    const trackedPosition = new Cesium.Cartesian3(0, 0, 0);
     const trackedCamera = Cesium.Cartesian3.clone(DEFAULT_VIEW);
 
     /* Connects to util.problem */
@@ -781,9 +780,7 @@ function initialize() {
     /* Change the tracked flight */
     function changeFlight(flight) {
         if (flight && flight.tracker) {
-            const viewFrom = new Cesium.Cartesian3.clone(trackedCamera);
-            Cesium.Cartesian3(viewFrom, trackedPosition, viewFrom);
-            flight.tracker.viewFrom = viewFrom;
+            flight.tracker.viewFrom = trackedCamera;
             viewer.trackedEntity = flight.tracker;
         } else {
             viewer.trackedEntity = null;
@@ -1112,11 +1109,9 @@ function initialize() {
         const pilot = state.pilot;
         const any = state.any;
 
-        /* Note the tracked entity's position for use when changing trackers */
-        if (viewer.trackedEntity) {
-            viewer.trackedEntity.position.getValue(clock.currentTime, trackedPosition);
+        /* Note the tracked entity's camera position for use when changing trackers */
+        if (viewer.trackedEntity)
             Cesium.Cartesian3.clone(viewer.camera.position, trackedCamera);
-        }
 
         const current = clock.currentTime;
         let video = null;
