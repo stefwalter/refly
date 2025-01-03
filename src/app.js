@@ -6,7 +6,8 @@ import * as Cesium from "cesium";
 import IGCParser from "./igc-parser.js";
 import {
     DisplayOptions,
-    DisplayOptionsButton,
+    SkipGapsButton,
+    HighResolutionButton,
 } from "./displayoptions.js";
 import { problem, assert, failure, warning, message } from './util.js';
 import { parseTimestamp, parseTimezone, parseDuration } from './util.js';
@@ -37,20 +38,6 @@ const DIAL_TICKS = [ 0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 1
 /* Defined in config.js */
 Cesium.Ion.defaultAccessToken = window.defaultAccessToken;
 
-/* The baselayer */
-// const BING_MAPS = 2; // Bing maps
-const BASE_LAYER = 3954; // Sentinel-2
-
-const viewer = new Cesium.Viewer('cesiumContainer', {
-    terrain: Cesium.Terrain.fromWorldTerrain(),
-    baseLayer: Cesium.ImageryLayer.fromProviderAsync(Cesium.IonImageryProvider.fromAssetId(BASE_LAYER)),
-    selectionIndicator: false,
-    geocoder: false,
-    scene3DOnly: true,
-    projectionPicker: false,
-    baseLayerPicker: false,
-});
-
 class State extends DisplayOptions {
     constructor() {
         super();
@@ -77,11 +64,19 @@ class State extends DisplayOptions {
     }
 };
 
-const state = new State();
-
-/* For Javascript console debugging */
-window.viewer = viewer;
-window.state = state;
+/* Share these in our console for Javascript debugging */
+const state = window.state = new State();
+const viewer = window.viewer = new Cesium.Viewer('cesiumContainer', {
+    terrain: Cesium.Terrain.fromWorldTerrain(),
+    // TODO: Figure out why this works
+    baseLayer: Cesium.ImageryLayer.fromProviderAsync( Cesium.ArcGisMapServerImageryProvider.fromUrl('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer', { })),
+    // baseLayer: state.imageProvider,
+    selectionIndicator: false,
+    geocoder: false,
+    scene3DOnly: true,
+    projectionPicker: false,
+    baseLayerPicker: false,
+});
 
 /*
  * All colors available
@@ -1164,7 +1159,7 @@ function initialize() {
             changeVideo(video);
 
         /* If in seamless mode, and no video/flight displayed then jump to next one */
-        if (!found && clock.shouldAnimate && state.seamless && state.intervals.length)
+        if (!found && clock.shouldAnimate && state.skipGaps && state.intervals.length)
             jumpTimeline(clock.multiplier > 0 ? true : false, true);
 
     });
@@ -1352,9 +1347,22 @@ function initialize() {
             element.appendChild(extra.childNodes[0]);
     }());
 
+    /* Set up the right base layer */
+    Cesium.knockout.getObservable(state, 'imageProvider').subscribe(function(val) {
+        val.then(function(provider) {
+            console.log("Changing imagery base layer to", provider);
+            const layers = viewer.scene.globe.imageryLayers;
+            layers.remove(layers.get(0));
+            layers.addImageryProvider(provider);
+        }).catch(function(ex) {
+            failure("Coludn't load image provider", ex);
+        });
+    });
+
     // TODO: Need to call destroy() on this when we implement resetting screen
     const element = document.getElementsByClassName("cesium-viewer-toolbar")[0];
-    new DisplayOptionsButton(element, { viewModel: state });
+    new SkipGapsButton(element, { viewModel: state });
+    new HighResolutionButton(element, { viewModel: state });
 
     /* Finally make the widget visible */
     viewer.container.style.display = 'block';
