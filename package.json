@@ -11,16 +11,19 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "cesium": "^1.124.0",
-    "express": "^4.16.4",
-    "igc-parser": "^2.0.0"
+    "cesium": "^1.125.0",
+    "exifreader": "^4.26.0",
+    "express": "^4.21.2",
+    "igc-parser": "^2.0.0",
+    "mp4box": "^0.5.3",
+    "qtffbox": "github:stefwalter/qtffbox.js"
   },
   "devDependencies": {
     "@vitest/browser": "^2.1.8",
     "@vitest/coverage-v8": "^2.1.8",
-    "eslint": "^9.17.0",
-    "playwright": "^1.49.1",
-    "vite": "^6.0.5",
+    "eslint": "^9.19.0",
+    "playwright": "^1.50.0",
+    "vite": "^6.0.11",
     "vite-plugin-eslint": "^1.8.1",
     "vite-plugin-static-copy": "^2.2.0",
     "vitest": "^2.1.8"

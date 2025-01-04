@@ -13,6 +13,13 @@ import { problem, assert, failure, warning, message } from './util.js';
 import { parseTimestamp, parseTimezone, parseDuration } from './util.js';
 import { guessMimeType } from './util.js';
 
+import {
+    extractMetadata,
+    extractDuration,
+    extractFile,
+    extractIGC,
+} from './extract.js';
+
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./style.css";
 
@@ -132,6 +139,9 @@ class Flight {
         /* IGC files have timezone in floating point hours, we need it in seconds */
         if (typeof igcData.timezone == "number")
             this.timezone = igcData.timezone * 3600;
+
+        /* Feed context to our extraction functions */
+        extractIGC(igcData);
 
         // The SampledPositionedProperty stores the position/timestamp for each sample along the series.
         const paragliderPositions = new Cesium.SampledPositionProperty();
@@ -334,7 +344,8 @@ class Video {
         return this.videoData;
     }
 
-    create() {
+    /* The hints are optional, default metadata */
+    create(hints) {
         const that = this;
         const videoData = that.videoData;
 
@@ -379,13 +390,63 @@ class Video {
 
         const pilot = Pilot.ensure(videoData.pilot);
 
-        // TODO: Validate dates
-        const start = parseTimestamp(videoData.timestamp);
+        that.entities = [ ];
 
-        function completeVideo() {
+        /* Passed an array of possible metadata objects about the video/image */
+        function completeVideo(metadatas) {
             spinner(identifier, false);
 
-            const duration = parseDuration(videoData.duration) || DEFAULT_DURATION;
+            /* Collapse all the provided metadata */
+            const metadata = metadatas.reduce(function(metadata, data) {
+                for (const key in data) {
+                    if (data[key] !== undefined)
+                        metadata[key] = data[key];
+                }
+                return metadata;
+            }, { });
+
+            const start = parseTimestamp(metadata.timestamp);
+
+            /* The position of the video */
+            let position = null;
+
+            /* These values have to be correct or we wont see the video billboard. Shrug */
+            if (metadata.longitude || metadata.latitude || metadata.altitude) {
+                const longitude = metadata.longitude || 0;
+                const latitude = metadata.latitude || 0;
+                const altitude = metadata.altitude || 0;
+
+                if (typeof longitude != "number" || Math.abs(longitude) > 180 ||
+                    typeof latitude != "number" ||  Math.abs(latitude) > 90 ||
+                    typeof altitude != "number" || altitude < 0) {
+                    warning("Invalid latitude/longitude/altitude position:",
+                            latitude, longitude, altitude);
+                } else {
+                    position = Cesium.Cartesian3.fromDegrees(longitude, latitude, altitude);
+                }
+            }
+
+            /* Otherwise find a flight that overlaps this video's start */
+            if (!position) {
+                const flight = pilot.flights.findDataForIntervalContainingDate(start);
+                if (flight)
+                    position = flight.paraglider.position.getValue(start);
+            }
+
+            /* A billboard to see the video */
+            if (position) {
+                const datauri = PLAY_BUTTON.replace("black", pilot.color.toCssHexString()).replace('#', '%23');
+                const billboard = viewer.entities.add({
+                    position: position,
+                    billboard: { image: datauri, width: 32, height: 32 },
+                });
+
+                billboard.data = that;
+                that.entities.push(billboard);
+            }
+
+            /* If no duration provided (such as an image), just use the default */
+            const duration = parseDuration(metadata.duration) || DEFAULT_DURATION;
             const stop = start.clone();
             Cesium.JulianDate.addSeconds(start, duration * that.rate, stop);
 
@@ -409,74 +470,17 @@ class Video {
             that.range.setRange(interval.start, interval.stop);
         }
 
-        that.entities = [ ];
-
-        /* The position of the video */
-        let position = null;
-
-        /* These values have to be correct or we wont see the video billboard. Shrug */
-        if (videoData.longitude || videoData.latitude || videoData.altitude) {
-            const longitude = videoData.longitude || 0;
-            const latitude = videoData.latitude || 0;
-            const altitude = videoData.altitude || 0;
-
-            if (typeof longitude != "number" || Math.abs(longitude) > 180 ||
-                typeof latitude != "number" ||  Math.abs(latitude) > 90 ||
-                typeof altitude != "number" || altitude < 0) {
-                warning("Invalid latitude/longitude/altitude position:",
-                    latitude, longitude, altitude);
-            } else {
-                position = Cesium.Cartesian3.fromDegrees(longitude, latitude, altitude);
-            }
-        }
-
-        /* Find a flight that overlaps this video's start */
-        if (!position) {
-            const flight = pilot.flights.findDataForIntervalContainingDate(start);
-            if (flight)
-                position = flight.paraglider.position.getValue(start);
-        }
-
-        /* A billboard to see the video */
-        if (position) {
-            const datauri = PLAY_BUTTON.replace("black", pilot.color.toCssHexString()).replace('#', '%23');
-            const billboard = viewer.entities.add({
-                position: position,
-                billboard: { image: datauri, width: 32, height: 32 },
-            });
-
-            billboard.data = that;
-            that.entities.push(billboard);
-        }
-
         that.element = element;
         that.element.data = that;
         spinner(identifier, true);
 
-        return new Promise((resolve, reject) => {
-            if (isImage || videoData.duration) {
-                completeVideo();
-                resolve();
-                return;
-            }
-
-            const timeout = window.setTimeout(function() {
-                element.removeEventListener("loadedmetadata", listener);
-                window.clearTimeout(timeout);
-                reject(new Error("Timeout finding duration of video: " + that.name));
-            }, 10000);
-            const listener = element.addEventListener("loadedmetadata", function() {
-                element.removeEventListener("loadedmetadata", listener);
-                window.clearTimeout(timeout);
-                if (element.duration) {
-                    videoData.duration = element.duration;
-                    completeVideo();
-                    resolve();
-                } else {
-                    reject(new Error("Unable to find duration of video: " + that.name));
-                }
-            });
-        });
+        /* Provide all the metadata sources, in ascending order of importance/override */
+        return Promise.all([
+            hints || { },
+            extractMetadata(isImage ? source : that.element),
+            extractDuration(isImage ? source : that.element),
+            videoData,
+        ]).then(completeVideo);
     }
 
     destroy() {
@@ -563,10 +567,10 @@ class Video {
     }
 };
 
-Video.load = async function loadVideo(videoData) {
-    // TODO: Put all the validation here
+/* The videoData is JSON, and file is an optional File object */
+Video.load = async function loadVideo(videoData, hints) {
     const video = new Video(videoData);
-    await video.create();
+    await video.create(hints);
     return video;
 };
 
@@ -1239,7 +1243,7 @@ function initialize() {
                 pilot: state.pilot.name,
                 timestamp: Cesium.JulianDate.toIso8601(viewer.clock.currentTime, 0),
                 type: type,
-            }, coordinates));
+            }, coordinates), extractFile(file));
 
         } else if (type == "application/x-igc") {
             promise = Flight.load(file.name);
@@ -1314,6 +1318,10 @@ function initialize() {
         URL.revokeObjectURL(url);
     });
 
+    document.getElementById("add-button").addEventListener("click", function(/* ev */) {
+        document.getElementById("file-add").click();
+    });
+
     document.getElementById("file-upload").addEventListener("change", function(ev) {
         const files = ev.target.files;
         let metadata = null;
@@ -1332,6 +1340,44 @@ function initialize() {
         load(null);
     });
 
+    document.getElementById("file-add").addEventListener("change", function(ev) {
+        const promises = [];
+
+        /* Load all the fligths, since they contain metadata for images */
+        for (let i = 0; i < ev.target.files.length; i++) {
+            const file = ev.target.files[i];
+            const type = guessMimeType(file.name, file.type);
+
+            if (type == "application/x-igc") {
+                state.blobs[file.name] = URL.createObjectURL(file);
+                promises.push(Flight.load(file.name));
+            }
+        }
+
+        /* Load all the images and videos */
+        for (let i = 0; i < ev.target.files.length; i++) {
+            const file = ev.target.files[i];
+            const type = guessMimeType(file.name, file.type);
+
+            if (type.startsWith("image/") || type.startsWith("video/")) {
+                state.blobs[file.name] = URL.createObjectURL(file);
+                promises.push(Video.load({
+                    filename: file.name,
+                    pilot: state.pilot.name,
+                    type: type,
+                }, extractFile(file)));
+
+            } else if (type != "application/x-igc") {
+                warning("Couldn't load unsupported dropped item:", file.name);
+            }
+        }
+
+        Promise.all(promises).then(function() {
+            loaded(null);
+        }).catch(function(ex) {
+            failure("Couldn't load files", ex);
+        });
+    });
     viewer.scene.globe.tileLoadProgressEvent.addEventListener(function(ev) {
         spinner("tiles", !currentVideo && ev > 0, 5000);
     });

@@ -38,7 +38,8 @@ div.content img {
 
 #pilot,
 #open-button,
-#save-button {
+#save-button,
+#add-button {
     position: absolute;
     top: 5px;
     height: 20px;
@@ -49,22 +50,31 @@ div.content img {
 }
 
 #pilot {
-    right: 197px;
+    right: 270px;
     font-weight: bold;
 }
 
 #open-button {
     color: white;
-    right: 155px;
+    right: 228px;
     font-weight: bold;
 }
 
 #save-button {
     color: white;
-    right: 118px;
+    right: 190px;
 }
 
-#file-upload {
+#add-button {
+    color:white;
+    right: 156px;
+    font-weight: bold;
+    font-size: 16pt;
+    line-height: 14pt;
+}
+
+#file-upload,
+#file-add {
     display: none;
 }
 
