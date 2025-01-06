@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "cesium": "^1.124.0",
-    "express": "^4.16.4"
+    "express": "^4.16.4",
+    "igc-parser": "github:stefwalter/igc-parser"
   },
   "devDependencies": {
     "@vitest/browser": "^2.1.8",

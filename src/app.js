@@ -3,7 +3,7 @@
 // TODO: Eventually remove this and do individual imports
 import * as Cesium from "cesium";
 
-import IGCParser from "./igc-parser.js";
+import IGCParser from "igc-parser";
 import {
     DisplayOptions,
     SkipGapsButton,
