@@ -88,10 +88,10 @@ export function parseDuration(timestamp) {
  * provided as option alguments and return the
  * extension list that matches.
  */
-export function guessMimeType(filename, kind) {
+export function guessMimeType(filename, type) {
     assert(typeof filename == "string");
-    if (typeof kind == "string")
-        return kind;
+    if (typeof type == "string" && type)
+        return type;
     const lcase = filename.toLowerCase();
     if (lcase.endsWith(".igc"))
 	return "application/x-igc";

@@ -183,6 +183,7 @@ test('parseDuration', function() {
 
 test('guessMimeType', function() {
     expect(util.guessMimeType('test.igc', "text/plain")).toBe("text/plain");
+    expect(util.guessMimeType('test.igc', "")).toBe("application/x-igc");
     expect(util.guessMimeType('test.igc', null)).toBe("application/x-igc");
     expect(util.guessMimeType('test.igc')).toBe('application/x-igc');
     expect(util.guessMimeType('test.IGC')).toBe('application/x-igc');

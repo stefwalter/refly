@@ -345,7 +345,7 @@ class Video {
                 that.rate = videoData.rate;
         }
 
-        const isImage = guessMimeType(videoData.filename, videoData.kind).startsWith("image/");
+        const isImage = guessMimeType(videoData.filename, videoData.type).startsWith("image/");
         const element = document.createElement(isImage ? "div" : "video");
         element.setAttribute("class", "content");
         element.style.visibility = "hidden";
@@ -1224,19 +1224,18 @@ function initialize() {
 
         const file = ev.dataTransfer.files[0];
         const item = ev.dataTransfer.items[0];
-        const kind = item.kind || "";
         const url = URL.createObjectURL(file);
         state.blobs[file.name] = url;
 
         let promise = null;
-        const type = guessMimeType(file.name, kind);
+        const type = guessMimeType(file.name, item.type || "");
         if (type.startsWith("image/") || type.startsWith("video/")) {
             const coordinates = currentFlight ? null : pixelToLocation(ev.clientX, ev.clientY);
             promise = Video.load(Object.assign({
                 filename: file.name,
                 pilot: state.pilot.name,
                 timestamp: Cesium.JulianDate.toIso8601(viewer.clock.currentTime, 0),
-                kind: kind,
+                type: type,
             }, coordinates));
 
         } else if (type == "application/x-igc") {
