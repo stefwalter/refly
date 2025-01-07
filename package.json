@@ -13,7 +13,7 @@
   "dependencies": {
     "cesium": "^1.124.0",
     "express": "^4.16.4",
-    "igc-parser": "github:stefwalter/igc-parser"
+    "igc-parser": "^2.0.0"
   },
   "devDependencies": {
     "@vitest/browser": "^2.1.8",
