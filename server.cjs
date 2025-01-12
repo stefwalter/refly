@@ -10,6 +10,8 @@ const IGCParser = require('igc-parser');
 
 const app = express();
 
+app.use(express.static(path.join(__dirname, "dist")));
+
 const directory = process.argv.at(2);
 if (process.argv.length == 3) {
     if (!fs.existsSync(directory)) {
@@ -23,22 +25,11 @@ if (process.argv.length == 3) {
 
 // http://expressjs.com/en/starter/basic-routing.html
 app.get('/', function(request, response) {
-  response.sendFile(path.join(__dirname, 'index.html'));
+  response.sendFile(path.join(__dirname, "dist", 'index.html'));
 });
 
-/* All the assets of the actual application */
-[
-    "style.css",
-    "app.js",
-    "igc-parser.js",
-    "config.js",
-    "index.html",
-    "favicon.png",
-].forEach((filename) => app.get('/' + filename,
-    function(request, response) {
-        response.sendFile(path.join(__dirname, filename));
-    }
-));
+// Media files to serve
+app.use("/media", express.static(path.join(__dirname, "media")));
 
 // listen for requests :)
 const listener = app.listen(process.env.PORT, function() {
