@@ -645,9 +645,12 @@ Pilot.change = function changePilot(pilot) {
 };
 
 function qualifiedUrl(path) {
+    if (path in state.blobs)
+        return state.blobs[path];
+    path = path.replace(/^[/.]+|[/]+$/g, '');
     if (state.folder)
-        path = state.folder + "/" + path;
-    return state.blobs[path] || path;
+        path = "/media/" + state.folder + "/" + path;
+    return path;
 }
 
 async function load(folder) {
