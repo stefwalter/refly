@@ -34,6 +34,8 @@ export default defineConfig({
                 { src: `${cesiumSource}/Workers`, dest: cesiumBaseUrl },
                 { src: `${cesiumSource}/Assets`, dest: cesiumBaseUrl },
                 { src: `${cesiumSource}/Widgets`, dest: cesiumBaseUrl },
+                { src: "public/config.js", dest: "" },
+                { src: "public/favicon.png", dest: "" },
             ],
         }),
     ],
@@ -42,6 +44,7 @@ export default defineConfig({
         CESIUM_BASE_URL: JSON.stringify(`/${cesiumBaseUrl}`),
     },
     build: {
+        copyPublicDir: false,
         rollupOptions: {
             external: [ "public/config.js" ],
         }
