@@ -20,11 +20,13 @@ import ExifReader from 'exifreader';
 import {
     parseTimestamp,
     parseTimezone,
-} from "./util";
+} from "./util.js";
 
 extendQTFF(BoxParser);
 
+/* These are used to populate "missing" data */
 let timezone = undefined;
+let pilot = undefined;
 
 export function learnTimezone(value, force) {
     console.assert(typeof value === "number" || typeof value === "undefined");
@@ -50,6 +52,13 @@ function getTimezoneSeconds() {
         -(new Date("1970-01-01T00:00:00").valueOf()) / 1000;
 }
 
+export function learnPilot(value, force) {
+    console.assert(typeof value === "string" || typeof value === "undefined");
+    if (force || pilot === undefined)
+        pilot = value;
+    return pilot;
+}
+
 async function getMP4Info(reader) {
     console.assert(reader.read);
 
@@ -69,9 +78,10 @@ async function getMP4Info(reader) {
     while (!result) {
         const res = await reader.read();
         if (res.value) {
-            res.value.buffer.fileStart = fileStart;
-            file.appendBuffer(res.value.buffer);
-            fileStart += res.value.buffer.byteLength;
+            const buffer = res.value.buffer || res.value;
+            buffer.fileStart = fileStart;
+            file.appendBuffer(buffer);
+            fileStart += buffer.byteLength;
         }
         if (res.done) {
             file.flush();
@@ -162,39 +172,54 @@ function filterTimestamp(ts) {
 
 const MP4_1904 = (new Date('1904-01-01T00:00:00Z').getTime());
 
-function parseMvhdTimestamp(mvhd, field) {
+function parseMvhdTimestamp(mvhd, field, offset) {
     const value = mvhd[field];
     if (!value)
         return undefined;
     const julian = JulianDate.fromDate(new Date(MP4_1904 + value * 1000));
+    JulianDate.addSeconds(julian, offset || 0, julian);
     return JulianDate.toIso8601(julian, 0);
 }
 
-export async function extractMP4(reader) {
-    console.assert(reader.read);
+/* Insta360 Studio names files like VID_20241021_114923_00_174.mp4 */
+const INSTA360_STUDIO_VID_RE = /^VID_\d\d\d\d\d\d\d\d_\d\d\d\d\d\d_\d.*.mp4$/;
 
-    const result = await getMP4Info(reader);
-    if (!result)
+function isInsta360(filename) {
+    const base = (filename || "").split("/").pop();
+    return !!base.match(INSTA360_STUDIO_VID_RE);
+}
+
+export async function extractMP4(reader, filename) {
+    const mp4 = await getMP4Info(reader);
+    if (!mp4)
         return null;
 
     let duration = undefined;
+    let offset = 0;
     const timestamps = [];
 
-    if (result.mvhd) {
+    /*
+     * Insta360 Studio encodes the local time as the media timecode.
+     * So we offset it with the timezone.
+     */
+    if (isInsta360(filename))
+        offset = -getTimezoneSeconds();
+
+    if (mp4.mvhd) {
 
         /* The duration in the MP4 file is in timescale multiple */
-        duration = result.mvhd[0].duration / result.mvhd[0].timescale;
+        duration = mp4.mvhd[0].duration / mp4.mvhd[0].timescale;
 
         /* The timestamps in MP4 header are in seconds since 1904-01-01 */
-        timestamps.push(parseMvhdTimestamp(result.mvhd[0], 'creation_time'));
-        timestamps.push(parseMvhdTimestamp(result.mvhd[0], 'modification_time'));
+        timestamps.push(parseMvhdTimestamp(mp4.mvhd[0], 'creation_time', offset));
+        timestamps.push(parseMvhdTimestamp(mp4.mvhd[0], 'modification_time', offset));
     }
 
     const locations = [];
 
-    for (let i = 0; i < result.udta.length; i++) {
-        for (let j = 0; j < result.udta[i].boxes.length; j++) {
-            const box = result.udta[i].boxes[j];
+    for (let i = 0; i < mp4.udta.length; i++) {
+        for (let j = 0; j < mp4.udta[i].boxes.length; j++) {
+            const box = mp4.udta[i].boxes[j];
             if (box.type == "loci")
                 locations.unshift(parseMP4Loci(box.data));
             else if (box.type == "date")
@@ -204,9 +229,9 @@ export async function extractMP4(reader) {
         }
     }
 
-    for (let i = 0; i < result.meta.length; i++) {
-        const keys = result.meta[i].keys;
-        const ilst = result.meta[i].ilst;
+    for (let i = 0; i < mp4.meta.length; i++) {
+        const keys = mp4.meta[i].keys;
+        const ilst = mp4.meta[i].ilst;
         if (!keys || !ilst)
             continue;
         for (const k in keys.keys) {
@@ -222,10 +247,14 @@ export async function extractMP4(reader) {
         }
     }
 
-    return Object.assign({
-        "duration": typeof duration == "number" ? duration : undefined,
+    const result = {
         "timestamp": timestamps.filter(filterTimestamp)[0],
-    }, locations.filter(filterLocation)[0]);
+    };
+    if (pilot)
+        result['pilot'] = pilot;
+    if (duration)
+        result['duration'] = duration;
+    return Object.assign(result, locations.filter(filterLocation)[0]);
 }
 
 function rationalToFloat(rational) {
@@ -288,6 +317,9 @@ export async function extractEXIF(loadable) {
     if (latitude)
         result['latitude'] = degreesToFloat(latitude[0], latitude[1], latitude[2]);
 
+    if (pilot)
+        result['pilot'] = pilot;
+
     return result;
 }
 
@@ -315,20 +347,22 @@ export function extractDuration(element, timeout) {
     });
 }
 
-export async function extractMetadata(element) {
+export async function extractMetadata(element, filename) {
+    let result = null;
     if (element.tagName == "VIDEO") {
         const sources = element.getElementsByTagName("source");
         const url = sources.length > 0 ? sources[0].getAttribute("src") : null;
         if (!url)
             return { };
         const response = await fetch(url);
-        return await extractMP4(response.body.getReader());
+        result = await extractMP4(response.body.getReader(), filename || url);
     } else {
         const url = element.getAttribute('src');
         const response = await fetch(url);
         const arraybuffer = await response.arrayBuffer();
-        return await extractEXIF(arraybuffer);
+        result = await extractEXIF(arraybuffer);
     }
+    return result;
 }
 
 /*
@@ -358,8 +392,12 @@ export async function extractIGC(igcData) {
 
     /* IGC files have timezone in floating point hours, we need it in seconds */
     if (typeof igcData.timezone == "number")
-        learnTimezone(igcData.timezone * 3600);
+        learnTimezone(igcData.timezone * 3600, true);
 
-    /* Not yet implemented */
-    return { };
+    if (typeof igcData.pilot == "string")
+        learnPilot(igcData.pilot, true);
+
+    return {
+        "pilot": igcData.pilot,
+    };
 }

@@ -7,6 +7,7 @@ import {
     extractEXIF,
     extractFile,
     extractIGC,
+    learnPilot,
     learnTimezone,
 } from './extract';
 
@@ -227,6 +228,8 @@ test('Metadata VIDEO', async function() {
     video.appendChild(source);
     document.body.appendChild(video);
 
+    learnPilot("Alice");
+
     const data = await extractMetadata(video);
     expect(data).toStrictEqual({
         "altitude": 2408.05810546875,
@@ -234,6 +237,7 @@ test('Metadata VIDEO', async function() {
         "latitude": 32.05848693847656,
         "longitude": 76.74400329589844,
         "timestamp": "2024-10-03T11:16:14+0530",
+        "pilot": "Alice",
     });
 });
 
@@ -248,12 +252,15 @@ test('Metadata IMG', async function() {
     img.setAttribute('src', "/fixtures/iphone.JPEG");
     document.body.appendChild(img);
 
+    learnPilot("Alice");
+
     const data = await extractMetadata(img);
     expect(data).toStrictEqual({
         "altitude": 2404.6015727391873,
         "latitude": 32.03055555555555,
         "longitude": 76.74504166666667,
         "timestamp": "2024-10-06T10:51:58+05:30",
+        "pilot": "Alice",
     });
 });
 
@@ -276,11 +283,12 @@ test('File now', async function() {
 });
 
 test('IGC', async function() {
-    const mock = { "timezone": 5.5 };
+    const mock = { "timezone": 5.5, "pilot": "Max" };
 
     learnTimezone(undefined, true);
     const data = await extractIGC(mock);
-    expect(data).toStrictEqual({ });
+    expect(data).toStrictEqual({ "pilot": "Max" });
     expect(learnTimezone(undefined)).toBe(19800);
+    expect(learnPilot(undefined)).toBe("Max");
 });
 

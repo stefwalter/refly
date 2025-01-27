@@ -18,6 +18,7 @@ import {
     extractDuration,
     extractFile,
     extractIGC,
+    learnPilot,
 } from './extract.js';
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
@@ -388,8 +389,6 @@ class Video {
         }
         document.body.appendChild(element);
 
-        const pilot = Pilot.ensure(videoData.pilot);
-
         that.entities = [ ];
 
         /* Passed an array of possible metadata objects about the video/image */
@@ -406,6 +405,8 @@ class Video {
             }, { });
 
             const start = parseTimestamp(metadata.timestamp);
+
+            const pilot = Pilot.ensure(metadata.pilot || "");
 
             /* The position of the video */
             let position = null;
@@ -477,7 +478,7 @@ class Video {
         /* Provide all the metadata sources, in ascending order of importance/override */
         return Promise.all([
             hints || { },
-            extractMetadata(isImage ? source : that.element),
+            extractMetadata(isImage ? source : that.element, videoData.filename),
             extractDuration(isImage ? source : that.element),
             videoData,
         ]).then(completeVideo);
@@ -645,6 +646,7 @@ Pilot.change = function changePilot(pilot) {
     const element = document.getElementById("pilot");
     element.innerText = pilot.name || "Any pilot";
     element.style.color = pilot.color.toCssHexString();
+    learnPilot(pilot || undefined);
     console.log("Pilot", pilot.name);
 };
 
@@ -1340,44 +1342,46 @@ function initialize() {
         load(null);
     });
 
-    document.getElementById("file-add").addEventListener("change", function(ev) {
-        const promises = [];
+    async function addFiles(files) {
 
         /* Load all the fligths, since they contain metadata for images */
-        for (let i = 0; i < ev.target.files.length; i++) {
-            const file = ev.target.files[i];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
             const type = guessMimeType(file.name, file.type);
 
             if (type == "application/x-igc") {
                 state.blobs[file.name] = URL.createObjectURL(file);
-                promises.push(Flight.load(file.name));
+                await Flight.load(file.name);
             }
         }
 
         /* Load all the images and videos */
-        for (let i = 0; i < ev.target.files.length; i++) {
-            const file = ev.target.files[i];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
             const type = guessMimeType(file.name, file.type);
 
             if (type.startsWith("image/") || type.startsWith("video/")) {
                 state.blobs[file.name] = URL.createObjectURL(file);
-                promises.push(Video.load({
+                await Video.load({
                     filename: file.name,
-                    pilot: state.pilot.name,
                     type: type,
-                }, extractFile(file)));
+                }, extractFile(file));
 
             } else if (type != "application/x-igc") {
                 warning("Couldn't load unsupported dropped item:", file.name);
             }
         }
 
-        Promise.all(promises).then(function() {
+    }
+
+    document.getElementById("file-add").addEventListener("change", function(ev) {
+        addFiles(ev.target.files).then(function() {
             loaded(null);
         }).catch(function(ex) {
             failure("Couldn't load files", ex);
         });
     });
+
     viewer.scene.globe.tileLoadProgressEvent.addEventListener(function(ev) {
         spinner("tiles", !currentVideo && ev > 0, 5000);
     });
