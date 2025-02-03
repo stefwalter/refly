@@ -15,8 +15,7 @@
     "exifreader": "^4.26.0",
     "express": "^4.21.2",
     "igc-parser": "^2.0.0",
-    "mp4box": "^0.5.3",
-    "qtffbox": "github:stefwalter/qtffbox.js"
+    "mp4box": "github:stefwalter/mp4box.js"
   },
   "devDependencies": {
     "@vitest/browser": "^2.1.8",

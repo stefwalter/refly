@@ -5,15 +5,10 @@ import {
 } from 'cesium';
 
 import {
-    BoxParser,
     createFile,
     DataStream,
-} from 'mp4box';
-
-import {
-    extendQTFF,
     ItifTypes,
-} from 'qtffbox';
+} from 'mp4box';
 
 import ExifReader from 'exifreader';
 
@@ -21,8 +16,6 @@ import {
     parseTimestamp,
     parseTimezone,
 } from "./util.js";
-
-extendQTFF(BoxParser);
 
 /* These are used to populate "missing" data */
 let timezone = undefined;
