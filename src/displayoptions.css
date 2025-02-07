@@ -3,8 +3,8 @@
 }
 
 .cesium-toolbar-button.toggled {
-    border: 2px solid #48b;
-    background-color: #245;
+    border: 2px solid #73a6cc;
+    background-color: #3e7c9b;
 }
 
 .cesium-toolbar-button svg {
