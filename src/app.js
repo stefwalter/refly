@@ -646,7 +646,7 @@ Pilot.change = function changePilot(pilot) {
     const element = document.getElementById("pilot");
     element.innerText = pilot.name || "Any pilot";
     element.style.color = pilot.color.toCssHexString();
-    learnPilot(pilot || undefined);
+    learnPilot(pilot.name || undefined);
     console.log("Pilot", pilot.name);
 };
 
