@@ -1114,7 +1114,7 @@ function initialize() {
     /* Here we store the base playback rate (ie: clock multiplier) */
     viewer.clock.multiplier = DEFAULT_RATE;
 
-    viewer.clock.onTick.addEventListener(function(clock) {
+    function clockTick(clock, nested) {
         const pilot = state.pilot;
         const any = state.any;
 
@@ -1163,10 +1163,16 @@ function initialize() {
             changeVideo(video);
 
         /* If in seamless mode, and no video/flight displayed then jump to next one */
-        if (!found && clock.shouldAnimate && state.skipGaps && state.intervals.length)
+        if (!found && !nested && clock.shouldAnimate && state.skipGaps && state.intervals.length) {
             jumpTimeline(clock.multiplier > 0 ? true : false, true);
 
-    });
+            /* Run the tick again */
+            clockTick(clock, true);
+        }
+
+    }
+
+    viewer.clock.onTick.addEventListener(clockTick);
 
     var dragEntity = null;
 
