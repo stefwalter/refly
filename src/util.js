@@ -105,3 +105,20 @@ export function guessMimeType(filename, type) {
 	return "video/quicktime";
     return "application/binary";
 }
+
+const blobs = { };
+const folder = location.hash ? location.hash.substr(1) : null;
+
+export function qualifyFile(file) {
+    assert(file instanceof File);
+    blobs[file.name] = URL.createObjectURL(file);
+}
+
+export function qualifiedUrl(path) {
+    if (path in blobs)
+        return blobs[path];
+    path = path.replace(/^[/.]+|[/]+$/g, '');
+    if (folder)
+        path = "/media/" + folder + "/" + path;
+    return path;
+}
