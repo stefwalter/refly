@@ -3,8 +3,11 @@ import "./spinner.css";
 const spinners = new Object();
 
 export function spinner(identifier, waiting, timeout) {
+    const element = document.getElementById("spinner");
+    if (!element)
+        return;
     function visibility() {
-        document.getElementById("spinner").style.display = Object.keys(spinners).length > 0 ? "block" : "none";
+        element.style.display = Object.keys(spinners).length > 0 ? "block" : "none";
     }
     if (waiting && !(identifier in spinners)) {
         spinners[identifier] = window.setTimeout(function() {
