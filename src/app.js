@@ -19,6 +19,7 @@ import {
 } from './util.js';
 
 import {
+    createViewer,
     viewer,
 } from './viewer.js';
 
@@ -35,7 +36,7 @@ import {
 
 import {
     allIntervals,
-    jumpTimeline,
+    jump,
 } from './timeline.js';
 
 import {
@@ -66,6 +67,9 @@ const DIAL_TICKS = [ 0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 1
 
 /* Defined in config.js */
 Cesium.Ion.defaultAccessToken = window.defaultAccessToken;
+
+/* Initialize the Cesium.Viewer in this div */
+createViewer('cesiumContainer');
 
 class State extends DisplayOptions {
     constructor() {
@@ -305,8 +309,11 @@ function initialize() {
 
         /* Left or Right arrow keys (and optionally Ctrl modifier) */
         } else if (e.keyCode == 37 || e.keyCode == 39) {
-            if (allIntervals.length)
-                jumpTimeline(e.keyCode == 39, e.ctrlKey, e.shiftKey);
+            if (allIntervals.length) {
+                jump((e.keyCode == 37 ? jump.REVERSE : 0) |
+                     (e.ctrlKey ? jump.EDGE : 0) |
+                     (e.shiftKey ? jump.SMALL : 0));
+            }
         }
 
         viewer.clock.onTick.raiseEvent(viewer.clock);
@@ -437,7 +444,7 @@ function initialize() {
 
         /* If in seamless mode, and no video/track displayed then jump to next one */
         if (!found && !nested && clock.shouldAnimate && state.skipGaps && allIntervals.length) {
-            jumpTimeline(clock.multiplier > 0 ? true : false, true);
+            jump((clock.multiplier > 0 ? 0 : jump.REVERSE) | jump.EDGE);
 
             /* Run the tick again */
             clockTick(clock, true);

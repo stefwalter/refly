@@ -1,0 +1,41 @@
+{
+    "tracks": [],
+    "videos": [
+        {
+            "filename": "iphone.MP4",
+            "timestamp": "2024-10-03T11:16:14+0530",
+            "duration": 13.868333333333334,
+            "latitude": 32.05848693847656,
+            "longitude": 76.74400329589844,
+            "altitude": 2408.05810546875,
+            "person": null,
+            "rate": 1
+        },
+        {
+            "filename": "iphone.JPEG",
+            "timestamp": "2024-10-06T10:51:58+0530",
+            "altitude": 2404.6015727391873,
+            "longitude": 76.74504166666667,
+            "latitude": 32.03055555555555,
+            "person": null
+        },
+        {
+            "filename": "iphone.MOV",
+            "timestamp": "2024-10-08T14:52:09+0530",
+            "duration": 2.433333333333333,
+            "latitude": 32.0532,
+            "longitude": 76.705,
+            "altitude": 2083.109,
+            "person": null
+        },
+        {
+            "filename": "pixel.mp4",
+            "timestamp": "2025-01-27T04:32:02Z",
+            "duration": 1.7074,
+            "latitude": 48.9498,
+            "longitude": 8.3958,
+            "altitude": null,
+            "person": null
+        }
+    ]
+}
