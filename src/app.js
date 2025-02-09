@@ -14,6 +14,7 @@ import { parseTimezone, parseDuration } from './util.js';
 import {
     guessMimeType,
     qualifiedUrl,
+    qualifyBase,
     qualifyFile,
 } from './util.js';
 
@@ -692,6 +693,9 @@ function initialize() {
 }
 
 initialize();
+
+if (location.hash)
+    qualifyBase("/media/" + location.hash.substr(1));
 
 /* Load the folder described by the #bookmark in URI */
 load();

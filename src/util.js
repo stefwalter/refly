@@ -107,7 +107,11 @@ export function guessMimeType(filename, type) {
 }
 
 const blobs = { };
-const folder = location.hash ? location.hash.substr(1) : null;
+let base = "";
+
+export function qualifyBase(path) {
+    base = path;
+}
 
 export function qualifyFile(file) {
     assert(file instanceof File);
@@ -118,7 +122,7 @@ export function qualifiedUrl(path) {
     if (path in blobs)
         return blobs[path];
     path = path.replace(/^[/.]+|[/]+$/g, '');
-    if (folder)
-        path = "/media/" + folder + "/" + path;
+    if (base)
+        path = base + "/" + path;
     return path;
 }
