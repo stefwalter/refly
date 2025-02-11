@@ -140,9 +140,9 @@ function parseISO6709(data) {
     if (!match)
         return null;
     return {
-        "latitute": parseFloat(match[1]) || undefined,
-        "longitude": parseFloat(match[2]) || undefined,
-        "altitude": parseFloat(match[3]) || undefined,
+        "latitute": parseFloat(match[1]) || null,
+        "longitude": parseFloat(match[2]) || null,
+        "altitude": parseFloat(match[3]) || null,
     };
 }
 
@@ -182,10 +182,27 @@ function isInsta360(filename) {
     return !!base.match(INSTA360_STUDIO_VID_RE);
 }
 
-export async function extractMP4(reader, filename) {
+export async function extractMP4(reader, metadata) {
+    const result = Object.assign({ }, metadata);
+
+    /* Do we already have all our attributes? */
+    if ("timestamp" in result &&
+        "pilot" in result &&
+        "duration" in result &&
+        "longitude" in result &&
+        "latitude" in result &&
+        "altitude" in result) {
+        return result;
+    }
+
+    if (typeof reader == "string") {
+        const response = await fetch(reader);
+        reader = response.body.getReader();
+    }
+
     const mp4 = await getMP4Info(reader);
     if (!mp4)
-        return null;
+        return result;
 
     let duration = undefined;
     let offset = 0;
@@ -195,7 +212,7 @@ export async function extractMP4(reader, filename) {
      * Insta360 Studio encodes the local time as the media timecode.
      * So we offset it with the timezone.
      */
-    if (isInsta360(filename))
+    if (isInsta360(result.filename))
         offset = -getTimezoneSeconds();
 
     if (mp4.mvhd) {
@@ -208,7 +225,13 @@ export async function extractMP4(reader, filename) {
         timestamps.push(parseMvhdTimestamp(mp4.mvhd[0], 'modification_time', offset));
     }
 
-    const locations = [];
+    const locations = [
+        {
+            "longitude": null,
+            "latitude": null,
+            "altitude": null,
+        }
+    ];
 
     for (let i = 0; i < mp4.udta.length; i++) {
         for (let j = 0; j < mp4.udta[i].boxes.length; j++) {
@@ -240,13 +263,9 @@ export async function extractMP4(reader, filename) {
         }
     }
 
-    const result = {
-        "timestamp": timestamps.filter(filterTimestamp)[0],
-    };
-    if (pilot)
-        result['pilot'] = pilot;
-    if (duration)
-        result['duration'] = duration;
+    result["timestamp"] = timestamps.filter(filterTimestamp)[0] || null,
+    result['pilot'] = pilot || null;
+    result['duration'] = duration || null;
     return Object.assign(result, locations.filter(filterLocation)[0]);
 }
 
@@ -283,12 +302,27 @@ function exifToISO8601(date, offset) {
     }
 }
 
-export async function extractEXIF(loadable) {
+export async function extractEXIF(loadable, metadata) {
+    const result = Object.assign({ }, metadata);
+
+    /* Do we already have all our attributes? */
+    if ("timestamp" in result &&
+        "pilot" in result &&
+        "longitude" in result &&
+        "latitude" in result &&
+        "altitude" in result) {
+        return result;
+    }
+
+    if (typeof loadable == "string") {
+        const response = await fetch(loadable);
+        loadable = await response.arrayBuffer();
+    }
+
     function getTag(tags, key) {
         return tags[key] ? tags[key].value : undefined;
     }
     const tags = await ExifReader.load(loadable);
-    const result = {};
 
     const datetime = getTag(tags, 'DateTimeOriginal');
     const offset = getTag(tags, 'OffsetTimeOriginal') || [];
@@ -300,60 +334,77 @@ export async function extractEXIF(loadable) {
 
     const altitude = getTag(tags, 'GPSAltitude');
     const altitudeRef = getTag(tags, 'GPSAltitudeRef') || 0;
-    if (altitude)
-        result['altitude'] = (altitude[0] / altitude[1]) * (altitudeRef[0] == 1 ? -1 : 1);
+    result['altitude'] = altitude ? (altitude[0] / altitude[1]) * (altitudeRef[0] == 1 ? -1 : 1) : null;
 
     const longitude = getTag(tags, 'GPSLongitude');
-    if (longitude)
-        result['longitude'] = degreesToFloat(longitude[0], longitude[1], longitude[2]);
+    result['longitude'] = longitude ? degreesToFloat(longitude[0], longitude[1], longitude[2]) : null;
     const latitude = getTag(tags, 'GPSLatitude');
-    if (latitude)
-        result['latitude'] = degreesToFloat(latitude[0], latitude[1], latitude[2]);
+    result['latitude'] = latitude ? degreesToFloat(latitude[0], latitude[1], latitude[2]) : null;
 
-    if (pilot)
-        result['pilot'] = pilot;
+    result['pilot'] = pilot || null;
+
+    if (!("timestamp" in result))
+        result['timestamp'] = null;
 
     return result;
 }
 
-export function extractDuration(element, timeout) {
+export function extractDuration(element, metadata, timeout) {
+    const result = Object.assign({ }, metadata);
+
+    /* Already have duration */
+    if (typeof result.duration == "number")
+        return Promise.resolve(result);
+    if (element.duration) {
+        result.duration = element.duration;
+        return Promise.resolve(result);
+    }
+
     /* No duration on the element */
     if (element.tagName != "VIDEO")
-        return Promise.resolve({});
-    if (element.duration)
-        return Promise.resolve({ "duration": element.duration });
+        return Promise.resolve(result);
 
     return new Promise((resolve) => {
-        const timer = window.setTimeout(function() {
+        function clear() {
             element.removeEventListener("loadedmetadata", listener);
+            element.removeEventListener("error", errorlistener);
             window.clearTimeout(timer);
-
+        }
+        const timer = window.setTimeout(function() {
+            clear();
             /* No duration found, not an error but return null */
             console.warn("Timeout finding duration of video");
-            resolve({});
+            resolve(result);
         }, timeout || 10000);
+        const errorlistener = element.addEventListener("error", function() {
+            clear();
+            console.warn("Error finding duration of video");
+            resolve(result);
+        });
         const listener = element.addEventListener("loadedmetadata", function() {
-            element.removeEventListener("loadedmetadata", listener);
-            window.clearTimeout(timer);
-            resolve({ "duration": element.duration });
+            clear();
+            result.duration = element.duration;
+            resolve(result);
         });
     });
 }
 
-export async function extractMetadata(element, filename) {
-    let result = null;
+export async function extractMetadata(element, metadata) {
+    const copy = Object.assign({ }, metadata);
+    let result = undefined;
     if (element.tagName == "VIDEO") {
         const sources = element.getElementsByTagName("source");
         const url = sources.length > 0 ? sources[0].getAttribute("src") : null;
         if (!url)
-            return { };
-        const response = await fetch(url);
-        result = await extractMP4(response.body.getReader(), filename || url);
+            return copy;
+        if (!copy.filename)
+            copy.filename = url.split('/').reverse()[0];
+        result = await extractMP4(url, copy);
     } else {
         const url = element.getAttribute('src');
-        const response = await fetch(url);
-        const arraybuffer = await response.arrayBuffer();
-        result = await extractEXIF(arraybuffer);
+        if (!copy.filename)
+            copy.filename = url.split('/').reverse()[0];
+        result = await extractEXIF(url, copy);
     }
     return result;
 }
@@ -369,15 +420,17 @@ const FILENAME_RES = [
 ];
  */
 
-export async function extractFile(file) {
-    let timestamp = undefined;
+export async function extractFile(file, metadata) {
+    const result = Object.assign({ }, metadata);
 
     /* This is the file modified date. No TZ here, but Date.now() means no modified date */
-    if (!timestamp && file && file.lastModified && file.lastModified < Date.now() - 10000) {
-        timestamp = JulianDate.toIso8601(parseTimestamp(file.lastModified));
+    if (file && file.lastModified && file.lastModified < Date.now() - 10000) {
+        result.timestamp = JulianDate.toIso8601(parseTimestamp(file.lastModified));
+    } else {
+        result.timestamp = null;
     }
 
-    return { timestamp: timestamp };
+    return result;
 }
 
 export async function extractIGC(igcData) {

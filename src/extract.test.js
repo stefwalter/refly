@@ -26,6 +26,7 @@ test('iphone.MOV', async function() {
         "duration": 2.433333333333333,
         "latitute": 32.0532,
         "longitude": 76.705,
+        "pilot": null,
         "timestamp": "2024-10-08T14:52:09+0530",
     });
 });
@@ -41,6 +42,7 @@ test('iphone.MP4', async function() {
         "duration": 13.868333333333334,
         "latitude": 32.05848693847656,
         "longitude": 76.74400329589844,
+        "pilot": null,
         "timestamp": "2024-10-03T11:16:14+0530",
     });
 });
@@ -56,6 +58,7 @@ test('iphone-invalid.MP4', async function() {
         "duration": 13.868333333333334,
         "latitude": 32.05848693847656,
         "longitude": 76.74400329589844,
+        "pilot": null,
 
         /* Invalid date Box causes different date here */
         "timestamp": "2024-10-03T08:24:35Z"
@@ -73,6 +76,7 @@ test('iphone.JPEG', async function() {
         "latitude": 32.03055555555555,
         "longitude": 76.74504166666667,
         "timestamp": "2024-10-06T10:51:58+05:30",
+        "pilot": null,
     });
 });
 
@@ -84,9 +88,10 @@ test('pixel.mp4', async function() {
     const data = await extractMP4(reader);
     expect(data).toStrictEqual({
         "duration": 1.7074,
-        "altitude": undefined,
+        "altitude": null,
         "latitute": 48.9498,
         "longitude": 8.3958,
+        "pilot": null,
         "timestamp": "2025-01-27T04:32:02Z",
     });
 });
@@ -102,6 +107,7 @@ test('pixel.jpg', async function() {
         "latitude": 48.949755555555555,
         "longitude": 8.395772222222222,
         "timestamp": "2025-01-27T05:31:38+01:00",
+        "pilot": null,
     });
 });
 
@@ -116,6 +122,10 @@ test('Sony_HDR-HC3.jpg', async function() {
     const data = await extractEXIF(arraybuffer);
     expect(data).toStrictEqual({
         "timestamp": "2007-06-15T03:42:32Z",
+        "altitude": null,
+        "latitude": null,
+        "longitude": null,
+        "pilot": null,
     });
 });
 
@@ -133,7 +143,11 @@ test('Sony_HDR-HC3.jpg local timezone', async function() {
     const arraybuffer = await response.arrayBuffer();
     const data = await extractEXIF(arraybuffer);
     expect(data).toStrictEqual({
-        "timestamp": JulianDate.toIso8601(julian, 0)
+        "timestamp": JulianDate.toIso8601(julian, 0),
+        "pilot": null,
+        "altitude": null,
+        "latitude": null,
+        "longitude": null,
     });
 });
 
@@ -146,7 +160,13 @@ test('Sony_HDR-HC3-invalid.jpg', async function() {
 
     const arraybuffer = await response.arrayBuffer();
     const data = await extractEXIF(arraybuffer);
-    expect(data).toStrictEqual({ });
+    expect(data).toStrictEqual({
+        "altitude": null,
+        "latitude": null,
+        "longitude": null,
+        "pilot": null,
+        "timestamp": null,
+    });
 });
 
 
@@ -162,7 +182,7 @@ test('invalid.txt', async function() {
 
     const reader = response.body.getReader();
     const data = await extractMP4(reader);
-    expect(data).toBeNull();
+    expect(data).toStrictEqual({ });
     // expect(eargs).toStrictEqual(["my", "test", 5]);
 
     console.error = old;
@@ -181,16 +201,27 @@ test('Duration', async function() {
     expect(data).toStrictEqual({ "duration": 12.701315 });
 });
 
+test('Duration Error', async function() {
+    const video = document.createElement("video");
+    video.setAttribute("preload", "metadata");
+    const source = document.createElement("source");
+    source.setAttribute('src', "/fixtures/does-not-exist.ogv");
+    video.appendChild(source);
+    document.body.appendChild(video);
+
+    const data = await extractDuration(video, null, 500);
+    expect(data).toStrictEqual({ });
+});
+
 test('Duration Timeout', async function() {
     const video = document.createElement("video");
     video.setAttribute("preload", "metadata");
     const source = document.createElement("source");
-    /* We use OGV because chromium (running our tests) doesn't support MP4 */
     source.setAttribute('src', "/fixtures/invalid.txt");
     video.appendChild(source);
     document.body.appendChild(video);
 
-    const data = await extractDuration(video, 500);
+    const data = await extractDuration(video, null, 500);
     expect(data).toStrictEqual({ });
 });
 
@@ -237,6 +268,7 @@ test('Metadata VIDEO', async function() {
         "latitude": 32.05848693847656,
         "longitude": 76.74400329589844,
         "timestamp": "2024-10-03T11:16:14+0530",
+        "filename": "iphone.MP4",
         "pilot": "Alice",
     });
 });
@@ -256,6 +288,7 @@ test('Metadata IMG', async function() {
 
     const data = await extractMetadata(img);
     expect(data).toStrictEqual({
+        "filename": "iphone.JPEG",
         "altitude": 2404.6015727391873,
         "latitude": 32.03055555555555,
         "longitude": 76.74504166666667,
@@ -278,7 +311,7 @@ test('File now', async function() {
 
     const data = await extractFile(mock);
     expect(data).toStrictEqual({
-        "timestamp": undefined,
+        "timestamp": null,
     });
 });
 

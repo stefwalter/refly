@@ -191,8 +191,8 @@ export class Video {
         /* Provide all the metadata sources, in ascending order of importance/override */
         return Promise.all([
             hints || { },
-            extractMetadata(isImage ? source : that.element, videoData.filename),
-            extractDuration(isImage ? source : that.element),
+            extractMetadata(isImage ? source : that.element, videoData),
+            extractDuration(isImage ? source : that.element, videoData),
             videoData,
         ]).then(completeVideo);
     }
