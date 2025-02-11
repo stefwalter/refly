@@ -24,11 +24,13 @@ export const allIntervals = new TimeIntervalCollection();
  * REVERSE: jump backwards
  * EDGE: boolean to the next start/stop of video or track
  * SMALL: boolean try to do a smaller jump
+ * COLLAPSE: Skip gaps
  */
 export function jump(flags) {
     const forward = !(flags & jump.REVERSE);
     const edge = !!(flags & jump.EDGE);
     const small = !!(flags & jump.SMALL);
+    const collapse = !!(flags & jump.COLLAPSE);
 
     const current = viewer.clock.currentTime;
     const to = new JulianDate(0, 0, TimeStandard.UTC);
@@ -117,8 +119,8 @@ export function jump(flags) {
         if (edge && !forward) {
             interval = allIntervals.get((~index) - 1);
             if (interval) {
-                console.log("Jumping to prev stop", name());
-                JulianDate.clone(interval.stop, to);
+                console.log("Jumping to prev", collapse ? "start" : "stop", name());
+                JulianDate.clone(collapse ? interval.start : interval.stop, to);
             } else {
                 console.log("Jumping to beginning");
                 JulianDate.clone(viewer.clock.startTime, to);
@@ -128,8 +130,8 @@ export function jump(flags) {
         } else if (edge && forward) {
             interval = allIntervals.get(~index);
             if (interval) {
-                console.log("Jumping to next start", name());
-                JulianDate.clone(interval.start, to);
+                console.log("Jumping to next", collapse ? "stop" : "start", name());
+                JulianDate.clone(collapse ? interval.stop : interval.start, to);
             } else {
                 console.log("Jumping to ending");
                 JulianDate.clone(viewer.clock.stopTime, to);
@@ -174,3 +176,4 @@ export function jump(flags) {
 jump.REVERSE = 0x01;
 jump.EDGE = 0x02;
 jump.SMALL = 0x04;
+jump.COLLAPSE = 0x08;

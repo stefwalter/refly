@@ -312,7 +312,8 @@ function initialize() {
             if (allIntervals.length) {
                 jump((e.keyCode == 37 ? jump.REVERSE : 0) |
                      (e.ctrlKey ? jump.EDGE : 0) |
-                     (e.shiftKey ? jump.SMALL : 0));
+                     (e.shiftKey ? jump.SMALL : 0) |
+                     (state.skipGaps ? jump.COLLAPSE : 0));
             }
         }
 
