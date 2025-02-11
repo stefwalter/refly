@@ -4,13 +4,18 @@ import {
 
 import {
     ArcGisMapServerImageryProvider,
+    Camera,
     ImageryLayer,
+    Rectangle,
     Terrain,
     Viewer,
 } from 'cesium';
 
 /* This is where we copy the Cesium assets to in vite.config.js */
 window.CESIUM_BASE_URL = '/cesiumStatic';
+
+Camera.DEFAULT_VIEW_FACTOR = 0.5;
+Camera.DEFAULT_VIEW_RECTANGLE = Rectangle.fromDegrees(68.0, 7.0, 89.0, 35.0);
 
 export let viewer = null;
 
