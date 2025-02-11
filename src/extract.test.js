@@ -24,7 +24,7 @@ test('iphone.MOV', async function() {
     expect(data).toStrictEqual({
         "altitude": 2083.109,
         "duration": 2.433333333333333,
-        "latitute": 32.0532,
+        "latitude": 32.0532,
         "longitude": 76.705,
         "person": null,
         "timestamp": "2024-10-08T14:52:09+0530",
@@ -89,7 +89,7 @@ test('pixel.mp4', async function() {
     expect(data).toStrictEqual({
         "duration": 1.7074,
         "altitude": null,
-        "latitute": 48.9498,
+        "latitude": 48.9498,
         "longitude": 8.3958,
         "person": null,
         "timestamp": "2025-01-27T04:32:02Z",

@@ -140,7 +140,7 @@ function parseISO6709(data) {
     if (!match)
         return null;
     return {
-        "latitute": parseFloat(match[1]) || null,
+        "latitude": parseFloat(match[1]) || null,
         "longitude": parseFloat(match[2]) || null,
         "altitude": parseFloat(match[3]) || null,
     };
