@@ -101,8 +101,16 @@ export function jump(flags) {
 
         /* Jump to the stop of the interval */
         } else if (edge && forward) {
-            console.log("Jumping to stop", name());
-            JulianDate.clone(interval.stop, to);
+            if (collapse) {
+                assert(index < allIntervals.length - 1);
+                index++;
+                interval = allIntervals.get(index);
+                console.log("Jumping to start of later", name());
+                JulianDate.clone(interval.start, to);
+            } else {
+                console.log("Jumping to stop", name());
+                JulianDate.clone(interval.stop, to);
+            }
 
         /* Plain Arrow key */
         } else if (!edge) {

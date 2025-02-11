@@ -160,7 +160,7 @@ test('Edge jump forward', async function() {
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2025-01-27T04:32:03.7073999999993248Z");
 });
 
-test('Edge jump forward collapse', async function() {
+test('Edge collapse forward', async function() {
     await loadTimeline("timeline.json");
 
     expect(JulianDate.toIso8601(viewer.clock.startTime)).equals("2024-10-03T05:46:14Z");
@@ -171,21 +171,17 @@ test('Edge jump forward collapse', async function() {
     jump(jump.SMALL | jump.COLLAPSE);
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-03T05:46:24Z");
 
-    /* Should now be at the end of iphone.MP4, which is about 13 seconds long */
+    /* Should now be at the beginning of iphone.JPEG */
     jump(jump.EDGE | jump.COLLAPSE);
-    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-03T05:46:27.8683333333319752Z");
+    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:21:58Z");
 
-    /* Should now be at the end of the iphone.JPEG (since the time between is collapsed) */
+    /* Should now be at the beginning  of the iphone.MOV (since the time beween is collapsed) */
     jump(jump.EDGE | jump.COLLAPSE);
-    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:22:03Z");
+    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-08T09:22:09Z");
 
-    /* Should now be at the end of the iphone.MOV (since the time beween is collapsed) */
+    /* Should now be at the beginning of pixel.MP4 (since the time between is collapsed) */
     jump(jump.EDGE | jump.COLLAPSE);
-    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-08T09:22:11.4333333333343035Z");
-
-    /* Should now be at the end of pixel.MP4 (since the time between is collapsed) */
-    jump(jump.EDGE | jump.COLLAPSE);
-    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2025-01-27T04:32:03.7073999999993248Z");
+    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2025-01-27T04:32:02Z");
 
     /* End of the timeline, should still be at the same mark */
     jump(jump.EDGE | jump.COLLAPSE);
@@ -294,7 +290,6 @@ test('Edge jump backward collapse', async function() {
 
 test('Edge jump forward epsilon', async function() {
     await loadTimeline("timeline.json");
-    viewer.clock.multiplier = 0.1;
 
     expect(JulianDate.toIso8601(viewer.clock.startTime)).equals("2024-10-03T05:46:14Z");
     expect(JulianDate.toIso8601(viewer.clock.stopTime)).equals("2025-01-27T04:32:03.7073999999993248Z");
@@ -305,19 +300,23 @@ test('Edge jump forward epsilon', async function() {
     jump(jump.EDGE);
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:22:03Z");
 
-    /* Jump one second back in */
+    /* Jump 1 seconds back in */
+    viewer.clock.multiplier = 0.1;
     jump(jump.REVERSE);
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:22:02Z");
 
-    /* Now do an edge jump forward, we should end up at third */
+    /* Now do an edge jump forward, we should end up at third start */
+    viewer.clock.multiplier = 1;
     jump(jump.EDGE);
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-08T09:22:09Z");
 
     /* Jump one second back */
+    viewer.clock.multiplier = 0.1;
     jump(jump.REVERSE);
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-08T09:22:08Z");
 
     /* Now do an edge jump forward, we should end up at end of third */
+    viewer.clock.multiplier = 1;
     jump(jump.EDGE);
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-08T09:22:11.4333333333343035Z");
 });
@@ -329,18 +328,18 @@ test('Edge collapse forward epsilon', async function() {
     expect(JulianDate.toIso8601(viewer.clock.startTime)).equals("2024-10-03T05:46:14Z");
     expect(JulianDate.toIso8601(viewer.clock.stopTime)).equals("2025-01-27T04:32:03.7073999999993248Z");
 
-    /* Jump to end of second video */
+    /* Jump to beginning of second video */
     jump(jump.EDGE | jump.COLLAPSE);
-    jump(jump.EDGE | jump.COLLAPSE);
-    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:22:03Z");
+    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:21:58Z");
 
     /* Jump one second back in */
     jump(jump.REVERSE | jump.COLLAPSE);
-    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:22:02Z");
+    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:21:57Z");
 
-    /* Now do an edge jump forward, we should end up at end of third */
+    /* Now do an edge jump forward, we should end up at start of third */
+    viewer.clock.multiplier = 1;
     jump(jump.EDGE | jump.COLLAPSE);
-    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-08T09:22:11.4333333333343035Z");
+    expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-08T09:22:09Z");
 });
 
 test('Edge jump backward epsilon', async function() {
@@ -362,14 +361,17 @@ test('Edge jump backward epsilon', async function() {
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-08T09:22:10Z");
 
     /* Now do an edge jump backwards, we should end up at end of previous */
+    viewer.clock.multiplier = 1;
     jump(jump.REVERSE | jump.EDGE);
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:22:03Z");
 
     /* Jump one second past */
+    viewer.clock.multiplier = 0.1;
     jump();
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:22:04Z");
 
     /* Now do an edge jump backwards, we should end up at start */
+    viewer.clock.multiplier = 1;
     jump(jump.REVERSE | jump.EDGE);
     expect(JulianDate.toIso8601(viewer.clock.currentTime)).equals("2024-10-06T05:21:58Z");
 });
