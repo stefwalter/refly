@@ -14,12 +14,12 @@ PROVIDER_IDS["bing"] = PROVIDER_IDS["sentinel"];
 
 test('DisplayOptions', function() {
     const options = new DisplayOptions();
-    expect(options.skipGaps).toBe(false);
+    expect(options.collapse).toBe(true);
 
     let value = null;
-    knockout.getObservable(options, 'skipGaps').subscribe((val) => value = val);
-    options.skipGaps = true;
-    expect(value).toBe(true);
+    knockout.getObservable(options, 'collapse').subscribe((val) => value = val);
+    options.collapse = false;
+    expect(value).toBe(false);
 });
 
 test('DisplayToggleButton', function() {
@@ -31,20 +31,20 @@ test('DisplayToggleButton', function() {
 
     const button = new DisplayToggleButton("button-container", {
         viewModel: options,
-        field: "skipGaps",
-        innerHTML: "Skip Gaps"
+        field: "collapse",
+        innerHTML: "Collapse gaps in timeline"
     });
     expect(button.container).toBe(container);
     expect(button.element).toBe(container.firstChild);
     expect(button.viewModel).toBe(options);
 
-    expect(button.element.classList.contains("toggled")).toBe(false);
-    button.element.click();
-    expect(options.skipGaps).toBe(true);
     expect(button.element.classList.contains("toggled")).toBe(true);
-
-    options.skipGaps = false;
+    button.element.click();
+    expect(options.collapse).toBe(false);
     expect(button.element.classList.contains("toggled")).toBe(false);
+
+    options.collapse = true;
+    expect(button.element.classList.contains("toggled")).toBe(true);
 });
 
 test('DisplayToggleButton.destroy', function() {
@@ -56,7 +56,7 @@ test('DisplayToggleButton.destroy', function() {
 
     const button = new DisplayToggleButton("button-destroy", {
         viewModel: options,
-        field: "skipGaps",
+        field: "collapse",
         innerHTML: "Destroy"
     });
     expect(button.container).toBe(container);
@@ -65,9 +65,9 @@ test('DisplayToggleButton.destroy', function() {
     expect(element.parentNode).toBe(container);
 
     element.click();
-    expect(options.skipGaps).toBe(true);
+    expect(options.collapse).toBe(false);
     element.click();
-    expect(options.skipGaps).toBe(false);
+    expect(options.collapse).toBe(true);
 
     expect(button.isDestroyed()).toBe(false);
     button.destroy();
@@ -75,7 +75,7 @@ test('DisplayToggleButton.destroy', function() {
 
     expect(element.parentNode).toBe(null);
     element.click();
-    expect(options.skipGaps).toBe(false); /* Does not change */
+    expect(options.collapse).toBe(true); /* Does not change */
 });
 
 test('SkipGapsButton', function() {
@@ -86,10 +86,10 @@ test('SkipGapsButton', function() {
     const button = new SkipGapsButton(container, { viewModel: options });
     expect(button.container).toBe(container);
     expect(button.viewModel).toBe(options);
-    expect(button.viewModel.skipGaps).toBe(false);
+    expect(button.viewModel.collapse).toBe(true);
 
     button.element.click();
-    expect(button.viewModel.skipGaps).toBe(true);
+    expect(button.viewModel.collapse).toBe(false);
 });
 
 test('SkipGapsButton.optional', function() {
@@ -99,10 +99,10 @@ test('SkipGapsButton.optional', function() {
     const button = new SkipGapsButton(container);
     expect(button.container).toBe(container);
     expect(button.viewModel).toBeInstanceOf(DisplayOptions);
-    expect(button.viewModel.skipGaps).toBe(false);
+    expect(button.viewModel.collapse).toBe(true);
 
     button.element.click();
-    expect(button.viewModel.skipGaps).toBe(true);
+    expect(button.viewModel.collapse).toBe(false);
 });
 
 test('HighResolutionButton', function() {

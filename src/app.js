@@ -313,7 +313,7 @@ function initialize() {
                 jump((e.keyCode == 37 ? jump.REVERSE : 0) |
                      (e.ctrlKey ? jump.EDGE : 0) |
                      (e.shiftKey ? jump.SMALL : 0) |
-                     (state.skipGaps ? jump.COLLAPSE : 0));
+                     (state.collapse ? jump.COLLAPSE : 0));
             }
         }
 
@@ -444,7 +444,7 @@ function initialize() {
             changeVideo(video);
 
         /* If in seamless mode, and no video/track displayed then jump to next one */
-        if (!found && !nested && clock.shouldAnimate && state.skipGaps && allIntervals.length) {
+        if (!found && !nested && clock.shouldAnimate && state.collapse && allIntervals.length) {
             jump((clock.multiplier > 0 ? 0 : jump.REVERSE) | jump.EDGE);
 
             /* Run the tick again */

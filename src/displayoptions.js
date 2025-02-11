@@ -27,7 +27,7 @@ export class DisplayOptions {
         const sentinel = IonImageryProvider.fromAssetId(PROVIDER_IDS["sentinel"]);
 
         const self = this;
-        this.skipGaps = false;
+        this.collapse = true;
         this.highResolution = false;
         this.imageProvider = sentinel;
 
@@ -115,7 +115,7 @@ export class SkipGapsButton extends DisplayToggleButton {
     constructor(container, options) {
         super(container, Object.assign({
             innerHTML: FA_ANGLES_RIGHT,
-            field: "skipGaps",
+            field: "collapse",
         }, options));
     }
 }
