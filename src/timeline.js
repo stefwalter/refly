@@ -15,6 +15,9 @@ import {
 /* Seconds to jump when seeking */
 const JUMP_SECONDS = 10;
 
+/* Epsilon seconds to treat near edge of video */
+const EDGE_SECONDS = 2;
+
 /* The entire set of intervals for the timeline */
 export const allIntervals = new TimeIntervalCollection();
 
@@ -35,6 +38,7 @@ export function jump(flags) {
     const current = viewer.clock.currentTime;
     const to = new JulianDate(0, 0, TimeStandard.UTC);
     const seconds = JUMP_SECONDS * (forward ? 1 : -1) * Math.abs(small ? 1 : viewer.clock.multiplier);
+    const epsilon = EDGE_SECONDS * viewer.clock.multiplier;
 
     let index = allIntervals.indexOf(current);
     let interval = null;
@@ -48,10 +52,10 @@ export function jump(flags) {
     if (index >= 0) {
         interval = allIntervals.get(index);
         assert(interval);
-        if (!forward && JulianDate.equalsEpsilon(current, interval.start, 1)) {
+        if (!forward && JulianDate.equalsEpsilon(current, interval.start, epsilon)) {
             console.log("Jump assuming before", name());
             index = ~index; /* This is how we indicate we're before this interval */
-        } else if (forward && JulianDate.equalsEpsilon(current, interval.stop, 1)) {
+        } else if (forward && JulianDate.equalsEpsilon(current, interval.stop, epsilon)) {
             console.log("Jumping assuming after", name());
             index = ~(index + 1);
         }
@@ -59,13 +63,13 @@ export function jump(flags) {
     if (index < 0) {
         if (forward) {
             interval = allIntervals.get(~index);
-            if (interval && JulianDate.equalsEpsilon(current, interval.start, 1)) {
+            if (interval && JulianDate.equalsEpsilon(current, interval.start, epsilon)) {
                 console.log("Jump assuming within", name());
                 index = ~index;
             }
         } else {
             interval = allIntervals.get((~index) - 1);
-            if (interval && JulianDate.equalsEpsilon(current, interval.stop, 1)) {
+            if (interval && JulianDate.equalsEpsilon(current, interval.stop, epsilon)) {
                 console.log("Jump assuming within", name());
                 index = (~index) - 1;
             }
@@ -78,14 +82,14 @@ export function jump(flags) {
 
         /* We're at the start of the first interval */
         if (index == 0 && edge && !forward &&
-            JulianDate.equalsEpsilon(current, interval.start, 1)) {
+            JulianDate.equalsEpsilon(current, interval.start, epsilon)) {
 
             console.log("Jumping to beginning");
             JulianDate.clone(viewer.clock.startTime, to);
 
         /* We're at the end of the very last interval */
         } else if (index == allIntervals.length - 1 && edge && forward &&
-            JulianDate.equalsEpsilon(current, interval.stop, 1)) {
+            JulianDate.equalsEpsilon(current, interval.stop, epsilon)) {
 
             console.log("Jumping to ending");
             JulianDate.clone(viewer.clock.stopTime, to);
