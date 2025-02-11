@@ -111,8 +111,12 @@ export class Video {
             /* Collapse all the provided metadata */
             const metadata = metadatas.reduce(function(metadata, data) {
                 for (const key in data) {
-                    if (data[key] !== undefined)
+                    if (data[key] === null) {
+                        if (metadata[key] === undefined)
+                            metadata[key] = null;
+                    } else if (data[key] !== undefined) {
                         metadata[key] = data[key];
+                    }
                 }
                 return metadata;
             }, { });
