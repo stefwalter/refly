@@ -174,6 +174,9 @@ export class Video {
             interval.data = that;
             that.interval = interval;
 
+            /* We assume the extracted metadata is an update of our videoData */
+            that.videoData = metadata;
+
             pilot.add(that);
             assert(that.pilot == pilot);
 
