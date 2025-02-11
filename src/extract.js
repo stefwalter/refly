@@ -187,7 +187,7 @@ export async function extractMP4(reader, metadata) {
 
     /* Do we already have all our attributes? */
     if ("timestamp" in result &&
-        "pilot" in result &&
+        "person" in result &&
         "duration" in result &&
         "longitude" in result &&
         "latitude" in result &&
@@ -264,7 +264,7 @@ export async function extractMP4(reader, metadata) {
     }
 
     result["timestamp"] = timestamps.filter(filterTimestamp)[0] || null,
-    result['pilot'] = pilot || null;
+    result["person"] = pilot || null;
     result['duration'] = duration || null;
     return Object.assign(result, locations.filter(filterLocation)[0]);
 }
@@ -307,7 +307,7 @@ export async function extractEXIF(loadable, metadata) {
 
     /* Do we already have all our attributes? */
     if ("timestamp" in result &&
-        "pilot" in result &&
+        "person" in result &&
         "longitude" in result &&
         "latitude" in result &&
         "altitude" in result) {
@@ -341,7 +341,7 @@ export async function extractEXIF(loadable, metadata) {
     const latitude = getTag(tags, 'GPSLatitude');
     result['latitude'] = latitude ? degreesToFloat(latitude[0], latitude[1], latitude[2]) : null;
 
-    result['pilot'] = pilot || null;
+    result["person"] = pilot || null;
 
     if (!("timestamp" in result))
         result['timestamp'] = null;
@@ -444,6 +444,6 @@ export async function extractIGC(igcData) {
         learnPilot(igcData.pilot, true);
 
     return {
-        "pilot": igcData.pilot,
+        "person": igcData.pilot,
     };
 }

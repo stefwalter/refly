@@ -119,7 +119,7 @@ export class Video {
 
             const start = parseTimestamp(metadata.timestamp);
 
-            const pilot = Pilot.ensure(metadata.pilot || "");
+            const pilot = Pilot.ensure(metadata["person"] || "");
 
             /* The position of the video */
             let position = null;

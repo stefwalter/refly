@@ -26,7 +26,7 @@ test('iphone.MOV', async function() {
         "duration": 2.433333333333333,
         "latitute": 32.0532,
         "longitude": 76.705,
-        "pilot": null,
+        "person": null,
         "timestamp": "2024-10-08T14:52:09+0530",
     });
 });
@@ -42,7 +42,7 @@ test('iphone.MP4', async function() {
         "duration": 13.868333333333334,
         "latitude": 32.05848693847656,
         "longitude": 76.74400329589844,
-        "pilot": null,
+        "person": null,
         "timestamp": "2024-10-03T11:16:14+0530",
     });
 });
@@ -58,7 +58,7 @@ test('iphone-invalid.MP4', async function() {
         "duration": 13.868333333333334,
         "latitude": 32.05848693847656,
         "longitude": 76.74400329589844,
-        "pilot": null,
+        "person": null,
 
         /* Invalid date Box causes different date here */
         "timestamp": "2024-10-03T08:24:35Z"
@@ -76,7 +76,7 @@ test('iphone.JPEG', async function() {
         "latitude": 32.03055555555555,
         "longitude": 76.74504166666667,
         "timestamp": "2024-10-06T10:51:58+05:30",
-        "pilot": null,
+        "person": null,
     });
 });
 
@@ -91,7 +91,7 @@ test('pixel.mp4', async function() {
         "altitude": null,
         "latitute": 48.9498,
         "longitude": 8.3958,
-        "pilot": null,
+        "person": null,
         "timestamp": "2025-01-27T04:32:02Z",
     });
 });
@@ -107,7 +107,7 @@ test('pixel.jpg', async function() {
         "latitude": 48.949755555555555,
         "longitude": 8.395772222222222,
         "timestamp": "2025-01-27T05:31:38+01:00",
-        "pilot": null,
+        "person": null,
     });
 });
 
@@ -125,7 +125,7 @@ test('Sony_HDR-HC3.jpg', async function() {
         "altitude": null,
         "latitude": null,
         "longitude": null,
-        "pilot": null,
+        "person": null,
     });
 });
 
@@ -144,7 +144,7 @@ test('Sony_HDR-HC3.jpg local timezone', async function() {
     const data = await extractEXIF(arraybuffer);
     expect(data).toStrictEqual({
         "timestamp": JulianDate.toIso8601(julian, 0),
-        "pilot": null,
+        "person": null,
         "altitude": null,
         "latitude": null,
         "longitude": null,
@@ -164,7 +164,7 @@ test('Sony_HDR-HC3-invalid.jpg', async function() {
         "altitude": null,
         "latitude": null,
         "longitude": null,
-        "pilot": null,
+        "person": null,
         "timestamp": null,
     });
 });
@@ -269,7 +269,7 @@ test('Metadata VIDEO', async function() {
         "longitude": 76.74400329589844,
         "timestamp": "2024-10-03T11:16:14+0530",
         "filename": "iphone.MP4",
-        "pilot": "Alice",
+        "person": "Alice",
     });
 });
 
@@ -293,7 +293,7 @@ test('Metadata IMG', async function() {
         "latitude": 32.03055555555555,
         "longitude": 76.74504166666667,
         "timestamp": "2024-10-06T10:51:58+05:30",
-        "pilot": "Alice",
+        "person": "Alice",
     });
 });
 
@@ -320,7 +320,7 @@ test('IGC', async function() {
 
     learnTimezone(undefined, true);
     const data = await extractIGC(mock);
-    expect(data).toStrictEqual({ "pilot": "Max" });
+    expect(data).toStrictEqual({ "person": "Max" });
     expect(learnTimezone(undefined)).toBe(19800);
     expect(learnPilot(undefined)).toBe("Max");
 });

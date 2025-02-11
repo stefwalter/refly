@@ -520,7 +520,7 @@ function initialize() {
             const coordinates = currentTrack ? null : pixelToLocation(ev.clientX, ev.clientY);
             promise = Video.load(Object.assign({
                 filename: file.name,
-                pilot: state.pilot.name,
+                person: state.pilot.name,
                 timestamp: Cesium.JulianDate.toIso8601(viewer.clock.currentTime, 0),
                 type: type,
             }, coordinates), extractFile(file));
