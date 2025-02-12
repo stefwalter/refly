@@ -122,12 +122,18 @@ async function load() {
     const tracks = metadata.tracks || metadata.flights || [];
     const videos = metadata.videos || [];
 
+    spinner("loading-all", true);
+
     for (let i = 0; i < tracks.length; i++)
         await Track.load(tracks[i]);
 
+    const promises = [];
     for (let i = 0; i < videos.length; i++)
-        await Video.load(videos[i]);
+        promises.push(Video.load(videos[i]));
 
+    await Promise.all(promises);
+
+    spinner("loading-all", false);
     loaded(null);
 }
 
