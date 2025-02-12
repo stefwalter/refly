@@ -197,13 +197,10 @@ function loaded(last) {
     /* Fly to the item that was dropped */
     if (last) {
         changePilot(last.pilot);
-        if (last instanceof Track) {
-            viewer.camera.position = DEFAULT_VIEW;
+        if (last instanceof Track)
             entities = last.entities;
-        }
 
     } else if (viewer.entities.values.length) {
-        viewer.camera.position = DEFAULT_VIEW;
         entities = viewer.entities;
     }
 
