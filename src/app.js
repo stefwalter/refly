@@ -6,7 +6,6 @@ import * as Cesium from "cesium";
 import {
     DisplayOptions,
     SkipGapsButton,
-    HighResolutionButton,
 } from "./displayoptions.js";
 import { problem, assert, failure, warning, message } from './util.js';
 import { parseTimezone, parseDuration } from './util.js';
@@ -678,7 +677,7 @@ function initialize() {
     (function() {
         const element = document.querySelector(".cesium-navigation-help TABLE");
         const extra = document.getElementById("extra-help");
-        while (extra.childNodes.length)
+        while (element && extra.childNodes.length)
             element.appendChild(extra.childNodes[0]);
     }());
 
@@ -697,7 +696,6 @@ function initialize() {
     // TODO: Need to call destroy() on this when we implement resetting screen
     const element = document.getElementsByClassName("cesium-viewer-toolbar")[0];
     new SkipGapsButton(element, { viewModel: state });
-    new HighResolutionButton(element, { viewModel: state });
 
     /* Finally make the widget visible */
     viewer.container.style.display = 'block';

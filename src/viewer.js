@@ -6,6 +6,7 @@ import {
     ArcGisMapServerImageryProvider,
     Camera,
     ImageryLayer,
+    IonImageryProvider,
     Rectangle,
     Terrain,
     Viewer,
@@ -34,6 +35,7 @@ export function createViewer(container, mock) {
         scene3DOnly: true,
         projectionPicker: false,
         baseLayerPicker: false,
+        navigationHelpButton: false,
     };
 
     if (mock) {
@@ -42,7 +44,10 @@ export function createViewer(container, mock) {
     } else {
         // TODO: Figure out why this works
         options.baseLayer = ImageryLayer.fromProviderAsync( ArcGisMapServerImageryProvider.fromUrl('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer', { }));
+        // TODO: And this is for BING
+        // options.baseLayer = ImageryLayer.fromProviderAsync(IonImageryProvider.fromAssetId(2)),
         options.terrain = Terrain.fromWorldTerrain();
+        console.log(options.baseLayer, ArcGisMapServerImageryProvider || IonImageryProvider || null);
     }
 
     viewer = window.viewer = new Viewer(container, options);
