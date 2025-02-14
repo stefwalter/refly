@@ -44,8 +44,7 @@ export function jump(flags) {
     let interval = null;
 
     function name() {
-        assert(interval);
-        return interval.data ? interval.data.name : index;
+        return interval && interval.data ? interval.data.name : index;
     }
 
     /* Do our boundary epsilon matching here */
