@@ -302,21 +302,26 @@ function initialize() {
         } else if (e.keyCode == 35) {
             viewer.clock.currentTime = viewer.clock.stopTime;
 
-        /* PageUp and Page Down */
-        } else if (e.keyCode == 33 || e.keyCode == 34) {
+        /* PageUp and Page Down, or 'x' */
+        } else if (e.keyCode == 33 || e.keyCode == 34 || e.keyCode == 88) {
             if (e.keyCode == 33)
                 changePilot(state.pilot.prev);
             else
                 changePilot(state.pilot.next);
 
         /* Left or Right arrow keys (and optionally Ctrl modifier) */
-        } else if (e.keyCode == 37 || e.keyCode == 39) {
-            if (allIntervals.length) {
-                jump((e.keyCode == 37 ? jump.REVERSE : 0) |
-                     (e.ctrlKey ? jump.EDGE : 0) |
-                     (e.shiftKey ? jump.SMALL : 0) |
-                     (state.collapse ? jump.COLLAPSE : 0));
-            }
+        } else if (e.keyCode == 37 || e.keyCode == 39 || e.keyCode == 38 || e.keyCode == 40) {
+            let options = 0;
+            if (e.keyCode == 37 || e.keyCode == 38) /* Left or Up */
+                options |= jump.REVERSE;
+            if (e.ctrlKey || e.keyCode == 38 || e.keyCode == 40) /* Ctrl or Up/Down */
+                options |= jump.EDGE;
+            if (e.shiftKey) /* Shift */
+                options |= jump.SMALL;
+            if (state.collapse) /* Collapse */
+                options |= jump.COLLAPSE;
+            if (allIntervals.length)
+                jump(options);
         }
 
         viewer.clock.onTick.raiseEvent(viewer.clock);
